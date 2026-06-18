@@ -1,6 +1,6 @@
 # necromancer-tui
 
-A read-only terminal UI (Go + [Bubble Tea](https://github.com/charmbracelet/bubbletea))
+A terminal UI (Go + [Bubble Tea](https://github.com/charmbracelet/bubbletea))
 for `tmux-ai-necromancer`. Walks the running tmux server, joins each pane
 against the latest snapshot in the snapshot dir, and renders a table of
 sessions, panes, agents, and captured session ids.
@@ -14,5 +14,6 @@ make test       # unit tests
 Snapshot dir resolution honors `$NECROMANCER_SNAPSHOT_DIR`, defaulting to
 `~/.claude/tmux-snapshots`.
 
-Read-only: it does not mutate tmux or send keys. Use the bash scripts
-(`necro-restore.sh`, etc.) for actions.
+Capture mode can exit supported agents on demand (`claude` via `/exit`, `codex`
+via `/quit`) and append a snapshot record for restore. Use `make run-dry` to
+exercise that flow without sending keys to tmux.

@@ -28,8 +28,8 @@ killing a dozen live Claude Code sessions at once, with no way to get them back.
   erroring out.
 - **Reboot survival** — `prep`/`resume` wrappers that pair with tmux-resurrect +
   tmux-continuum to bring the whole layout (and every agent) back after a reboot.
-- **Session viewer (TUI)** — a Go + Bubble Tea read-only viewer that joins live
-  panes against the latest snapshot.
+- **Session viewer (TUI)** — a Go + Bubble Tea viewer/capture tool that joins
+  live panes against the latest snapshot and can exit supported agents on demand.
 
 ## Install
 

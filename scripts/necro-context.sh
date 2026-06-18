@@ -32,7 +32,7 @@ def text_of(content):
         return content
     if isinstance(content, list):
         return " ".join(c.get("text", "") for c in content
-                         if isinstance(c, dict) and c.get("type") == "text")
+                         if isinstance(c, dict) and c.get("type") in ("text", "input_text", "output_text"))
     return ""
 
 def is_real_user(t):

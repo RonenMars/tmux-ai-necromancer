@@ -1,4 +1,4 @@
-// Package snapshot reads JSONL snapshot files produced by claude-snapshot.sh
+// Package snapshot reads JSONL snapshot files produced by necro-snapshot.sh
 // and matches their records back to live tmux panes by pane_id.
 package snapshot
 
@@ -24,6 +24,7 @@ type Record struct {
 	PrevCmd        string `json:"prev_cmd"`
 	Agent          string `json:"agent"`
 	UUID           string `json:"uuid"`
+	UUIDSource     string `json:"uuid_source,omitempty"`
 	CapturedAt     string `json:"captured_at"`
 	FirstUser      string `json:"first_user"`
 	LastAssistant  string `json:"last_assistant"`
@@ -135,7 +136,7 @@ func ExtractResumeUUID(scrollback string) string {
 
 // AppendRecord appends one record to path as a single JSONL line.
 // Creates the file (and parent dirs) if missing. Used by the TUI to
-// build up a snapshot incrementally as each Claude is exited.
+// build up a snapshot incrementally as each agent is exited.
 func AppendRecord(path string, r Record) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err

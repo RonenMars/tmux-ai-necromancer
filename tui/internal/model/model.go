@@ -49,14 +49,14 @@ type Model struct {
 	height       int
 
 	// Phase 5 fields.
-	mode             viewMode
-	selectedPane     *tmux.Pane         // pane under review / exiting
-	scrollback       string             // last capture-pane output for review screen
-	captured         map[string]string  // pane_id -> uuid, this session's exits
-	sessionFile      string             // append target; lazy-created on first capture
-	dryRun           bool               // if true, log instead of mutating tmux
-	exitElapsed      int                // seconds elapsed in modeExiting
-	exitDeadlineHit  bool               // 20s timed out
+	mode            viewMode
+	selectedPane    *tmux.Pane        // pane under review / exiting
+	scrollback      string            // last capture-pane output for review screen
+	captured        map[string]string // pane_id -> uuid, this session's exits
+	sessionFile     string            // append target; lazy-created on first capture
+	dryRun          bool              // if true, log instead of mutating tmux
+	exitElapsed     int               // seconds elapsed in modeExiting
+	exitDeadlineHit bool              // 20s timed out
 }
 
 // Options configures the TUI on startup.
@@ -120,10 +120,11 @@ type tickMsg struct{}
 
 // exitDoneMsg fires when polling finishes (success, timeout, or fatal error).
 type exitDoneMsg struct {
-	paneID     string
-	uuid       string
-	timedOut   bool
-	err        error
+	paneID   string
+	agent    string
+	uuid     string
+	timedOut bool
+	err      error
 }
 
 // Init loads tmux state and the latest snapshot on startup.
@@ -166,43 +167,73 @@ func tickCmd() tea.Cmd {
 // runExitCmd sends /exit + Enter to the pane, polls until the shell
 // returns or 20 seconds elapse, captures the scrollback, and extracts
 // the UUID. Runs in a tea.Cmd goroutine — never block the UI thread.
-func runExitCmd(paneID string, dryRun bool) tea.Cmd {
+type agentSpec struct {
+	name     string
+	exitKeys string
+}
+
+func agentForCommand(s string) (agentSpec, bool) {
+	switch strings.TrimSpace(s) {
+	case "claude":
+		return agentSpec{name: "claude", exitKeys: "/exit"}, true
+	case "codex":
+		return agentSpec{name: "codex", exitKeys: "/quit"}, true
+	default:
+		return agentSpec{}, false
+	}
+}
+
+func runExitCmd(pane tmux.Pane, agent agentSpec, dryRun bool) tea.Cmd {
 	return func() tea.Msg {
 		if dryRun {
-			return exitDoneMsg{paneID: paneID, uuid: "dry-run-no-uuid"}
+			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, uuid: "dry-run-no-uuid"}
 		}
-		// 1. Send /exit + Enter.
-		if err := tmux.SendKeys(paneID, "/exit", "Enter"); err != nil {
-			return exitDoneMsg{paneID: paneID, err: err}
+		// Record the time before sending the exit command so LatestCodexSessionID
+		// can filter to rollouts written at or after this moment, avoiding
+		// a stale session in the same directory being picked up by mistake.
+		exitStart := time.Now()
+		// 1. Send the agent's exit command + Enter.
+		if err := tmux.SendKeys(pane.PaneID, agent.exitKeys, "Enter"); err != nil {
+			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 		}
-		// 2. Poll up to 20s for the pane's foreground to leave 'claude'.
+		// 2. Poll up to 20s for the pane's foreground to leave the agent.
 		const maxWait = 20 * time.Second
 		const pollEvery = 500 * time.Millisecond
 		deadline := time.Now().Add(maxWait)
 		for time.Now().Before(deadline) {
 			time.Sleep(pollEvery)
-			cmd, err := tmux.PaneCurrentCommand(paneID)
+			cmd, err := tmux.PaneCurrentCommand(pane.PaneID)
 			if err != nil {
-				return exitDoneMsg{paneID: paneID, err: err}
+				return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 			}
-			if !isClaudeCmd(cmd) {
+			if strings.TrimSpace(cmd) != agent.name {
 				goto captured
 			}
 		}
-		return exitDoneMsg{paneID: paneID, timedOut: true}
+		return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, timedOut: true}
 	captured:
 		// 3. Capture scrollback and pull the UUID out.
-		text, err := tmux.CapturePane(paneID, 100)
+		text, err := tmux.CapturePane(pane.PaneID, 100)
 		if err != nil {
-			return exitDoneMsg{paneID: paneID, err: err}
+			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 		}
-		uuid := snapshot.ExtractResumeUUID(text)
-		return exitDoneMsg{paneID: paneID, uuid: uuid}
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
+		}
+		uuid, err := uuidForAgent(agent.name, text, home, pane.CWD, exitStart)
+		if err != nil {
+			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
+		}
+		return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, uuid: uuid}
 	}
 }
 
-func isClaudeCmd(s string) bool {
-	return strings.TrimSpace(s) == "claude"
+func uuidForAgent(agent, scrollback, home, cwd string, since time.Time) (string, error) {
+	if agent == "codex" {
+		return snapshot.LatestCodexSessionID(home, cwd, since)
+	}
+	return snapshot.ExtractResumeUUID(scrollback), nil
 }
 
 // Update handles input and incoming messages.
@@ -279,8 +310,8 @@ func (m Model) updateTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-// beginReview switches to the review screen for the currently selected
-// pane, if it's a Claude. Otherwise sets a status hint and stays put.
+// beginReview switches to the review screen for the currently selected agent
+// pane. Otherwise sets a status hint and stays put.
 func (m Model) beginReview() (tea.Model, tea.Cmd) {
 	idx := m.table.Cursor()
 	pane := m.paneAtRow(idx)
@@ -292,8 +323,8 @@ func (m Model) beginReview() (tea.Model, tea.Cmd) {
 		m.status = "refusing to exit the TUI's own pane"
 		return m, nil
 	}
-	if !isClaudeCmd(pane.CurrentCommand) {
-		m.status = fmt.Sprintf("pane %s is running '%s', not claude", pane.PaneID, pane.CurrentCommand)
+	if _, ok := agentForCommand(pane.CurrentCommand); !ok {
+		m.status = fmt.Sprintf("pane %s is running '%s', not a supported agent", pane.PaneID, pane.CurrentCommand)
 		return m, nil
 	}
 	m.selectedPane = pane
@@ -365,13 +396,19 @@ func (m Model) beginExit() (tea.Model, tea.Cmd) {
 		m.mode = modeTable
 		return m, nil
 	}
+	agent, ok := agentForCommand(m.selectedPane.CurrentCommand)
+	if !ok {
+		m.mode = modeTable
+		m.status = fmt.Sprintf("pane %s is no longer a supported agent", m.selectedPane.PaneID)
+		return m, nil
+	}
 	m.mode = modeExiting
 	m.exitElapsed = 0
 	m.exitDeadlineHit = false
-	m.status = fmt.Sprintf("sending /exit to %s%s",
-		m.selectedPane.PaneID, dryRunSuffix(m.dryRun))
+	m.status = fmt.Sprintf("sending %s to %s%s",
+		agent.exitKeys, m.selectedPane.PaneID, dryRunSuffix(m.dryRun))
 	return m, tea.Batch(
-		runExitCmd(m.selectedPane.PaneID, m.dryRun),
+		runExitCmd(*m.selectedPane, agent, m.dryRun),
 		tickCmd(),
 	)
 }
@@ -411,12 +448,16 @@ func (m Model) finishExit(msg exitDoneMsg) Model {
 		return m
 	}
 	if msg.uuid == "" {
-		m.status = fmt.Sprintf("exited %s but no UUID found in scrollback", msg.paneID)
+		if msg.agent == "codex" {
+			m.status = fmt.Sprintf("exited %s but no Codex rollout found matching pane CWD", msg.paneID)
+		} else {
+			m.status = fmt.Sprintf("exited %s but no UUID found in scrollback", msg.paneID)
+		}
 		return m
 	}
 	// Success.
 	m.captured[msg.paneID] = msg.uuid
-	if err := m.persistCapture(msg.paneID, msg.uuid); err != nil {
+	if err := m.persistCapture(msg.paneID, msg.agent, msg.uuid); err != nil {
 		m.status = fmt.Sprintf("captured %s=%s but write failed: %v", msg.paneID, msg.uuid[:8], err)
 		return m
 	}
@@ -427,7 +468,7 @@ func (m Model) finishExit(msg exitDoneMsg) Model {
 
 // persistCapture appends a snapshot record to the current session's
 // snapshot file. Lazy-creates the path on first call.
-func (m *Model) persistCapture(paneID, uuid string) error {
+func (m *Model) persistCapture(paneID, agent, uuid string) error {
 	if m.dryRun {
 		return nil
 	}
@@ -446,17 +487,30 @@ func (m *Model) persistCapture(paneID, uuid string) error {
 	if pane == nil {
 		return fmt.Errorf("pane %s no longer in state", paneID)
 	}
-	rec := snapshot.Record{
-		PaneID:      paneID,
+	rec := recordForPane(*pane, agent, uuid)
+	return snapshot.AppendRecord(m.sessionFile, rec)
+}
+
+func uuidSource(agent string) string {
+	if agent == "codex" {
+		return "latest-jsonl"
+	}
+	return "scrollback"
+}
+
+func recordForPane(pane tmux.Pane, agent, uuid string) snapshot.Record {
+	return snapshot.Record{
+		PaneID:      pane.PaneID,
 		Session:     pane.SessionName,
 		WindowIndex: pane.WindowIndex,
 		WindowName:  pane.WindowName,
 		CWD:         pane.CWD,
-		PrevCmd:     "claude",
+		PrevCmd:     agent,
+		Agent:       agent,
 		UUID:        uuid,
+		UUIDSource:  uuidSource(agent),
 		CapturedAt:  time.Now().UTC().Format(time.RFC3339),
 	}
-	return snapshot.AppendRecord(m.sessionFile, rec)
 }
 
 func (m *Model) rebuildRows() {
@@ -516,7 +570,7 @@ var (
 )
 
 func (m Model) viewTable() string {
-	title := "tmux-claude-tui · pane viewer"
+	title := "necromancer-tui · pane viewer"
 	if m.dryRun {
 		title += " (dry-run)"
 	}
@@ -525,7 +579,7 @@ func (m Model) viewTable() string {
 		headerStyle.Render(title),
 		m.table.View(),
 		dimStyle.Render(m.status),
-		dimStyle.Render("↑/↓ move · e exit selected claude · r reload · q quit"),
+		dimStyle.Render("↑/↓ move · e exit selected agent · r reload · q quit"),
 	)
 }
 
@@ -562,7 +616,7 @@ func (m Model) viewExiting() string {
 		lipgloss.Left,
 		headerStyle.Render(title),
 		dimStyle.Render(m.status),
-		dimStyle.Render("(this can take up to 20s while Claude finishes /exit)"),
+		dimStyle.Render("(this can take up to 20s while the agent exits)"),
 	)
 }
 
