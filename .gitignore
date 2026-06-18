@@ -1,0 +1,12 @@
+# Go
+tui/necromancer-tui
+tui/bin/
+*.test
+*.out
+
+# OS
+.DS_Store
+
+# Local snapshots (never commit user session data)
+*.jsonl
+tmux-snapshots/

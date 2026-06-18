@@ -1,0 +1,107 @@
+package snapshot_test
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+
+	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/snapshot"
+)
+
+// Round-trip: write a minimal JSONL, LoadFile it back, verify fields.
+func TestLoadFile_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "sample.jsonl")
+	line := `{"pane_id":"%9","session":"2","window_index":1,"window_name":"omh","cwd":"/tmp","prev_cmd":"claude","uuid":"abc-123","captured_at":"2026-01-01T00:00:00Z","first_user":"hi","last_assistant":"hello","dest_session":"","dest_window_name":""}` + "\n"
+	if err := os.WriteFile(path, []byte(line), 0644); err != nil {
+		t.Fatal(err)
+	}
+	recs, err := snapshot.LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 1 {
+		t.Fatalf("want 1 record, got %d", len(recs))
+	}
+	r := recs[0]
+	if r.PaneID != "%9" || r.UUID != "abc-123" || r.WindowIndex != 1 {
+		t.Fatalf("unexpected record: %+v", r)
+	}
+}
+
+// LoadLatest must handle a missing directory gracefully (no error).
+func TestLoadLatest_MissingDir(t *testing.T) {
+	recs, path, err := snapshot.LoadLatest("/definitely/not/a/real/path/xyz")
+	if err != nil {
+		t.Fatalf("want nil error for missing dir, got %v", err)
+	}
+	if recs != nil || path != "" {
+		t.Fatalf("want empty result, got recs=%v path=%q", recs, path)
+	}
+}
+
+// ExtractResumeUUID covers the realistic shapes Claude prints on /exit.
+func TestExtractResumeUUID(t *testing.T) {
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "typical exit line",
+			in:   "Bye! To resume this session run claude --resume 3fb28a80-62ac-4f76-8748-9d6944764f4b\n",
+			want: "3fb28a80-62ac-4f76-8748-9d6944764f4b",
+		},
+		{
+			name: "no uuid at all",
+			in:   "see you later\n",
+			want: "",
+		},
+		{
+			name: "picks the LAST uuid in scrollback",
+			in: "old session was 11111111-1111-1111-1111-111111111111\n" +
+				"new session: claude --resume 22222222-2222-2222-2222-222222222222\n",
+			want: "22222222-2222-2222-2222-222222222222",
+		},
+		{
+			name: "rejects non-hex tokens",
+			in:   "garbage gggggggg-gggg-gggg-gggg-gggggggggggg\n",
+			want: "",
+		},
+		{
+			name: "tolerates ANSI escape junk around the uuid",
+			in:   "\x1b[1mclaude --resume\x1b[0m abcd1234-ef56-7890-1234-567890abcdef end",
+			want: "abcd1234-ef56-7890-1234-567890abcdef",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := snapshot.ExtractResumeUUID(tc.in)
+			if got != tc.want {
+				t.Fatalf("want %q, got %q", tc.want, got)
+			}
+		})
+	}
+}
+
+// AppendRecord must create parent dirs and serialize each call as one
+// JSON Lines entry that LoadFile can read back.
+func TestAppendRecord_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "nested", "out.jsonl")
+	r1 := snapshot.Record{PaneID: "%1", UUID: "u1", Session: "s", CWD: "/tmp"}
+	r2 := snapshot.Record{PaneID: "%2", UUID: "u2", Session: "s", CWD: "/tmp"}
+	if err := snapshot.AppendRecord(path, r1); err != nil {
+		t.Fatal(err)
+	}
+	if err := snapshot.AppendRecord(path, r2); err != nil {
+		t.Fatal(err)
+	}
+	recs, err := snapshot.LoadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recs) != 2 || recs[0].PaneID != "%1" || recs[1].UUID != "u2" {
+		t.Fatalf("unexpected records: %+v", recs)
+	}
+}
