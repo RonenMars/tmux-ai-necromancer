@@ -110,6 +110,11 @@ body {
 
 /* ── Responsive breakpoints ── */
 
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
 @media (max-width: 768px) {
   .grid-hero        { grid-template-columns: 1fr !important; }
   .grid-how         { grid-template-columns: 1fr !important; }
@@ -120,6 +125,8 @@ body {
   .skull-bg         { display: none !important; }
   .nav-links        { display: none !important; }
   .cmd-row          { flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; }
+  .hamburger        { display: flex !important; }
+  .mobile-drawer    { display: block; }
 }
 
 @media (max-width: 480px) {
