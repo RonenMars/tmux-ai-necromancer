@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 const links = [
   { label: 'Home', href: '#top' },
   { label: 'Features', href: '#features' },
-  { label: 'Resources', href: '#resources' },
-  { label: 'Terminal', href: '#terminal' },
+  { label: 'Keybindings', href: '#resources' },
+  { label: 'Install', href: '#terminal' },
 ];
 
 export default function Nav() {
