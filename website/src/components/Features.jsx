@@ -49,7 +49,7 @@ export default function Features() {
   return (
     <section id="features" style={{ padding: '80px 28px', maxWidth: 1200, margin: '0 auto' }}>
       <SectionHead eyebrow="// what it does" title="Four moves between dead and alive" />
-      <div style={{
+      <div className="grid-features" style={{
         display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 18, marginTop: 44,
       }}>
         {items.map((it) => (

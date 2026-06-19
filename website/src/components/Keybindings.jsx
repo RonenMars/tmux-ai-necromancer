@@ -35,7 +35,7 @@ export default function Keybindings() {
   return (
     <section id="resources" style={{ padding: '80px 28px', maxWidth: 1200, margin: '0 auto' }}>
       <SectionHead eyebrow="// keybindings & commands" title="Two keys. The rest is muscle memory." />
-      <div style={{
+      <div className="grid-keybindings" style={{
         display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: 40,
         marginTop: 44, alignItems: 'start',
       }}>
@@ -64,7 +64,7 @@ export default function Keybindings() {
           overflow: 'hidden', background: 'var(--surface-1)',
         }}>
           {cmds.map((c, i) => (
-            <div key={c.cmd} style={{
+            <div key={c.cmd} className="cmd-row" style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
               padding: '16px 20px',
               borderTop: i ? '1px solid var(--line-faint)' : 'none',

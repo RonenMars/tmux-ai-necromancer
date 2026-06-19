@@ -28,7 +28,7 @@ export default function Nav() {
         </span>
       </a>
 
-      <nav style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+      <nav className="nav-links" style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
         {links.map((l) => {
           const active = l.label === 'Home';
           const on = hover === l.label;

@@ -16,7 +16,7 @@ export default function HowItWorks() {
     }}>
       <div style={{ padding: '80px 28px', maxWidth: 1200, margin: '0 auto' }}>
         <SectionHead eyebrow="// how it works" title="Like tmux-continuum, but for conversations" />
-        <div style={{
+        <div className="grid-how" style={{
           display: 'grid', gridTemplateColumns: '1.1fr 0.9fr', gap: 40,
           marginTop: 44, alignItems: 'center',
         }}>

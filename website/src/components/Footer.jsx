@@ -24,7 +24,7 @@ const cols = [
 export default function Footer() {
   return (
     <footer style={{ background: 'var(--void-900)', borderTop: '1px solid var(--line)' }}>
-      <div style={{
+      <div className="grid-footer" style={{
         padding: '56px 28px 40px', maxWidth: 1200, margin: '0 auto',
         display: 'grid', gridTemplateColumns: '1.4fr 1fr 1fr 1fr', gap: 40,
       }}>

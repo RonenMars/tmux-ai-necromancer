@@ -107,3 +107,22 @@ body {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
+
+/* ── Responsive breakpoints ── */
+
+@media (max-width: 768px) {
+  .grid-hero        { grid-template-columns: 1fr !important; }
+  .grid-how         { grid-template-columns: 1fr !important; }
+  .grid-keybindings { grid-template-columns: 1fr !important; }
+  .grid-features    { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-footer      { grid-template-columns: repeat(2, 1fr) !important; }
+  .grid-agents      { grid-template-columns: 1fr !important; }
+  .skull-bg         { display: none !important; }
+  .nav-links        { display: none !important; }
+  .cmd-row          { flex-direction: column !important; align-items: flex-start !important; gap: 4px !important; }
+}
+
+@media (max-width: 480px) {
+  .grid-features    { grid-template-columns: 1fr !important; }
+  .grid-footer      { grid-template-columns: 1fr !important; }
+}

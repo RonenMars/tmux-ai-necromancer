@@ -10,14 +10,14 @@ export default function Hero() {
       padding: '72px 28px 64px',
       background: 'var(--grad-hero-vignette), var(--bg-page)',
     }}>
-      <img src="/necromancer-skull.png" alt="" aria-hidden="true" style={{
+      <img src="/necromancer-skull.png" alt="" aria-hidden="true" className="skull-bg" style={{
         position: 'absolute', right: -80, top: -20, width: 620,
         opacity: 0.10, pointerEvents: 'none', filter: 'saturate(1.2)',
         maskImage: 'radial-gradient(60% 60% at 50% 40%, #000 30%, transparent 75%)',
         WebkitMaskImage: 'radial-gradient(60% 60% at 50% 40%, #000 30%, transparent 75%)',
       }} />
 
-      <div style={{
+      <div className="grid-hero" style={{
         position: 'relative', maxWidth: 1200, margin: '0 auto',
         display: 'grid', gridTemplateColumns: '1.05fr 1fr', gap: 56, alignItems: 'center',
       }}>

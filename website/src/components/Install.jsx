@@ -72,7 +72,7 @@ export default function Install() {
           </div>
           <div style={{ border: '1px solid var(--line)', borderRadius: 'var(--radius-md)', overflow: 'hidden' }}>
             {agents.map((a, i) => (
-              <div key={a.name} style={{
+              <div key={a.name} className="grid-agents" style={{
                 display: 'grid', gridTemplateColumns: '160px 1fr 1fr', gap: 16, alignItems: 'center',
                 padding: '16px 20px', background: 'var(--surface-1)',
                 borderTop: i ? '1px solid var(--line-faint)' : 'none',
