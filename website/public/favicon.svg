@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="6" fill="#0f111c"/>
+  <!-- skull dome -->
+  <path d="M16 5C10.477 5 6 9.253 6 14.5c0 3.182 1.617 6.003 4.1 7.75V25a1 1 0 0 0 1 1h9.8a1 1 0 0 0 1-1v-2.75C24.383 20.503 26 17.682 26 14.5 26 9.253 21.523 5 16 5z" fill="#00ff8c"/>
+  <!-- eye sockets -->
+  <ellipse cx="12.5" cy="15" rx="2.2" ry="2.5" fill="#0f111c"/>
+  <ellipse cx="19.5" cy="15" rx="2.2" ry="2.5" fill="#0f111c"/>
+  <!-- nose -->
+  <path d="M15 19.5h2v1.5h-2z" fill="#0f111c"/>
+  <!-- teeth -->
+  <rect x="10.8" y="25.8" width="2.2" height="2.2" rx="0.3" fill="#00ff8c"/>
+  <rect x="14.9" y="25.8" width="2.2" height="2.2" rx="0.3" fill="#00ff8c"/>
+  <rect x="19" y="25.8" width="2.2" height="2.2" rx="0.3" fill="#00ff8c"/>
+  <!-- glow hint -->
+  <ellipse cx="16" cy="14" rx="8" ry="7" fill="none" stroke="#00ff8c" stroke-width="0.5" opacity="0.3"/>
+</svg>
