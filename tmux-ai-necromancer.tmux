@@ -37,6 +37,14 @@ case "$status_right" in
   *) tmux set-option -gq status-right "#($AUTOSAVE)$status_right" ;;
 esac
 
+WATCHER="$CURRENT_DIR/scripts/necro-watch.sh"
+
+status_right="$(tmux show-option -gqv status-right 2>/dev/null)"
+case "$status_right" in
+  *necro-watch.sh*) : ;;  # already wired
+  *) tmux set-option -gq status-right "#($WATCHER)$status_right" ;;
+esac
+
 # Bind <prefix> <restore_key> to the restore script in a popup.
 restore_key="$(tmux show-option -gqv @necromancer_restore_key 2>/dev/null)"
 [ -z "$restore_key" ] && restore_key="R"

@@ -75,6 +75,15 @@ necro_json_escape() {
   printf '%s' "$1" | python3 -c 'import sys,json; sys.stdout.write(json.dumps(sys.stdin.read()))'
 }
 
+# --- Watcher cursor dir -----------------------------------------------------
+# Persistent cursor dir for the watcher (lives next to snapshots, not in /tmp).
+necro_watch_cursor_dir() {
+  local d
+  d="$(necro_snapshot_dir)/.watcher-cursors"
+  mkdir -p "$d"
+  printf '%s' "$d"
+}
+
 # --- Idle-shell test --------------------------------------------------------
 necro_is_idle_shell() {
   case "$1" in
