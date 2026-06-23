@@ -52,6 +52,16 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
 
   echo "[$(necro_ts)] autosave complete"
 
+  # Log panes whose agents exited since the last autosave.
+  while IFS=$'\t' read -r pane_id cwd; do
+    [ -z "$pane_id" ] && continue
+    exited="$(tmux show-option -pqv -t "$pane_id" @necro_agent_exited 2>/dev/null || true)"
+    [ "$exited" != "1" ] && continue
+    uuid="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
+    cmd="$(tmux show-option -pqv  -t "$pane_id" @necro_cmd  2>/dev/null || true)"
+    echo "[$(necro_ts)] closed: pane=$pane_id agent=${cmd:-unknown} uuid=${uuid:-none} cwd=$cwd"
+  done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_path}' 2>/dev/null)
+
   # Rotate: keep only the N most-recent autosave files. POSIX loop (runs under
   # /bin/sh via tmux — no `mapfile`).
   /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null \
