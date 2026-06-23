@@ -1,6 +1,6 @@
 # tmux-ai-necromancer 🪦
 
-![tmux-ai-necromancer](assets/github-banner-v2.png)
+<img src="assets/github-banner-v2.png" width="728" alt="tmux-ai-necromancer banner">
 
 > Bring your dead AI coding sessions back to life.
 
