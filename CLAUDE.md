@@ -73,15 +73,28 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
 6. **Path-agnostic.** Scripts resolve `PLUGIN_ROOT` from `${BASH_SOURCE[0]}`
    (following symlinks, since TPM symlinks). Never hardcode an install path.
 
+7. **Autosave uses an atomic `mkdir` lock** (`$SNAP_DIR/.autosave.lock`). Two
+   concurrent status-right evaluations can both pass the timestamp throttle
+   before either writes the new `@necromancer_last_saved` value (TOCTOU).
+   `mkdir` is the only POSIX-safe atomic primitive here; `trap ... EXIT` cleans
+   up on any exit path.
+
 ## Testing
 
-Run the bash logic against an **isolated tmux socket** so you never disturb the
-user's real server:
+Self-contained bash tests live in `tests/`. Each uses `mktemp -d` + `NECROMANCER_SNAPSHOT_DIR`
+for full isolation — no live tmux server required. Run any test directly:
+
+```bash
+bash tests/necro-autosave-lock-test.sh   # lock: only one concurrent autosave fires
+bash tests/necro-context-codex-test.sh   # context enrichment for Codex sessions
+```
+
+For restore/snapshot changes, run against an **isolated tmux socket**:
 
 ```bash
 tmux -L necrotest kill-server 2>/dev/null
-# wrap tmux to target the test socket, set NECROMANCER_SNAPSHOT_DIR to a tmpdir,
-# then exercise necro-restore.sh twice and assert window counts don't grow.
+# set NECROMANCER_SNAPSHOT_DIR to a tmpdir, exercise necro-restore.sh twice,
+# assert window counts don't grow.
 ```
 
 The TUI: `cd tui && go build ./... && go test ./...`.

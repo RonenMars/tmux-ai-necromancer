@@ -10,3 +10,4 @@ tui/bin/
 # Local snapshots (never commit user session data)
 *.jsonl
 tmux-snapshots/
+.worktrees/

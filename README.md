@@ -109,7 +109,8 @@ When an agent starts it pins the UUID immediately; when it exits it sets the
 exited flag so autosave can log the closed session.
 
 **Autosave** (`necro-autosave.sh`) self-throttles to your interval and, when due,
-runs a `--idle-only` snapshot in the background.
+runs a `--idle-only` snapshot in the background. An atomic `mkdir` lock prevents
+concurrent status-right evaluations from firing duplicate snapshots.
 
 A snapshot is JSON Lines, one record per pane:
 

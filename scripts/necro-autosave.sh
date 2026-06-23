@@ -32,8 +32,11 @@ now="$(date +%s)"
 next_run=$(( last_saved + interval_seconds ))
 [ "$now" -lt "$next_run" ] && exit 0
 
-# Mark run time before launching so concurrent status refreshes don't double-fire.
+# ponytail: mkdir is atomic — guarantees only one concurrent status-right fires
+LOCK_DIR="$SNAP_DIR/.autosave.lock"
+mkdir "$LOCK_DIR" 2>/dev/null || exit 0
 tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
+trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
 
 {
   echo "[$(necro_ts)] autosave started"
