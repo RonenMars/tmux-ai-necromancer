@@ -53,6 +53,17 @@ agent_claude_scrape_session_id() {
     | head -1
 }
 
+# Scrape a UUID from a startup "--resume <uuid>" line in scrollback.
+# Used by the watcher when a pane is first detected (resurrect edge case).
+agent_claude_scrape_resume_cmd() {
+  local pane="$1"
+  tmux capture-pane -p -t "$pane" -S -50 2>/dev/null \
+    | grep -oE -- "--resume $CLAUDE_UUID_RE" \
+    | tail -1 \
+    | grep -oE "$CLAUDE_UUID_RE" \
+    | head -1
+}
+
 # Shell command that resumes a given session id.
 agent_claude_resume_cmd() {
   printf 'claude --resume %s' "$1"
