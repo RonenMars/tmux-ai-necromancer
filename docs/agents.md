@@ -21,6 +21,11 @@ agent_<name>_latest_session_id() { ... }
 # Used only during interactive capture after a clean exit. Return "" if N/A.
 agent_<name>_scrape_session_id() { ... }
 
+# Optional: scrape a `--resume <uuid>` startup line from scrollback.
+# Used by the watcher on first detection to handle resurrect-restored panes.
+# Return "" if N/A.
+agent_<name>_scrape_resume_cmd() { ... }
+
 # The shell command that resumes a session id.
 agent_<name>_resume_cmd() { printf '<binary> resume %s' "$1"; }
 
@@ -49,6 +54,20 @@ The two reference adapters show both shapes:
   inside the first `session_meta` line, so the fallback scans recent rollouts
   newest-first and matches on that embedded cwd. No reliable scrollback hint, so
   the scrape returns "".
+
+## Command name matching
+
+`agent_<name>_matches` is called with `pane_current_command` — the process
+name the kernel sees. For Claude Code, this is `claude` by default, but if
+you run it via an alias or wrapper script named differently (e.g. `cc`), add
+your command name to `@necromancer_claude_commands`:
+
+```tmux
+set -g @necromancer_claude_commands 'claude cc'
+```
+
+Other agents: implement `agent_<name>_matches` to match however your binary
+appears in `pane_current_command`.
 
 ## Register it
 
