@@ -11,10 +11,11 @@ or reboot. Pure bash + a small Go TUI. No build step for the plugin itself.
 ## Architecture (read before editing)
 
 ```
-tmux-ai-necromancer.tmux   TPM entrypoint — wires autosave into status-right, binds restore key
+tmux-ai-necromancer.tmux   TPM entrypoint — wires autosave + watcher into status-right, binds restore key
 scripts/                   the executables (all source lib/*.sh)
   necro-snapshot.sh        walk panes → JSONL snapshot (per-agent id capture)
   necro-autosave.sh        status-right hook; throttled background snapshot + rotation
+  necro-watch.sh           status-right hook; per-tick pane watcher — pins @necro_uuid/@necro_agent to panes
   necro-restore.sh         rebuild sessions/windows from a snapshot (IDEMPOTENT)
   necro-apply.sh           reorganize LIVE panes into dest sessions + resume
   necro-context.sh         enrich a snapshot with conversation previews
@@ -38,6 +39,7 @@ defining these functions (all prefixed `agent_<name>_`):
 | `agent_<name>_matches "$cmd"` | exit 0 if the pane's foreground command is this agent |
 | `agent_<name>_latest_session_id "$cwd"` | most-recent resumable id for a cwd (filesystem fallback), or "" |
 | `agent_<name>_scrape_session_id "$pane"` | id scraped from pane scrollback, or "" |
+| `agent_<name>_scrape_resume_cmd "$pane"` | `--resume <uuid>` scraped from startup scrollback, or "" |
 | `agent_<name>_resume_cmd "$id"` | the shell command that resumes that id |
 | `agent_<name>_exit_keys` | keys to send for a clean exit (interactive capture) |
 

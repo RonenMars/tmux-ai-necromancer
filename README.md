@@ -20,9 +20,13 @@ killing a dozen live Claude Code sessions at once, with no way to get them back.
 
 ## What it does
 
+- **Pane watcher** — a per-tick hook that detects agent panes the moment they
+  start (or exit) and pins the session UUID directly to the pane, so autosave
+  never has to guess. Handles command aliases (`cc` for `claude`, etc.).
 - **Autosave** — every 5 minutes (configurable), walks every tmux pane and
-  records each pane's agent + resumable session id to a JSONL snapshot. Runs in
-  the background off the status bar; **never touches a running agent**.
+  records each pane's agent + resumable session id to a JSONL snapshot. Prefers
+  watcher-pinned UUIDs; falls back to filesystem heuristics. Runs in the
+  background off the status bar; **never touches a running agent**.
 - **Restore** — reads the latest snapshot and recreates sessions/windows,
   running the right resume command per agent (`claude --resume <id>`,
   `codex resume <id>`, …). **Idempotent** — safe to run repeatedly on a
@@ -82,11 +86,12 @@ ones you use.
 Set these in `~/.tmux.conf` **before** the line that loads TPM:
 
 ```tmux
-set -g @necromancer_interval      '5'          # minutes between autosaves
-set -g @necromancer_max_snapshots '20'         # autosave files to keep
-set -g @necromancer_agents        'claude codex'  # which agents to track
-set -g @necromancer_restore_key   'R'          # prefix key for restore popup
-set -g @necromancer_snapshot_dir  '~/.claude/tmux-snapshots'  # where snapshots live
+set -g @necromancer_interval         '5'             # minutes between autosaves
+set -g @necromancer_max_snapshots    '20'            # autosave files to keep
+set -g @necromancer_agents           'claude codex'  # which agents to track
+set -g @necromancer_restore_key      'R'             # prefix key for restore popup
+set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
+set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
 ```
 
 The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
@@ -95,23 +100,30 @@ with prior Claude-only setups). Override with the option above or the
 
 ## How it works
 
-Like tmux-continuum, the plugin appends a `#(...)` call to `status-right`. tmux
-evaluates that on every status refresh; the script self-throttles to your
-interval and, when due, runs a `--idle-only` snapshot in the background.
+Like tmux-continuum, the plugin appends `#(...)` hooks to `status-right`. tmux
+evaluates those on every status refresh.
+
+**Pane watcher** (`necro-watch.sh`) runs every tick and maintains four tmux pane
+options: `@necro_uuid`, `@necro_agent`, `@necro_cmd`, and `@necro_agent_exited`.
+When an agent starts it pins the UUID immediately; when it exits it sets the
+exited flag so autosave can log the closed session.
+
+**Autosave** (`necro-autosave.sh`) self-throttles to your interval and, when due,
+runs a `--idle-only` snapshot in the background.
 
 A snapshot is JSON Lines, one record per pane:
 
 ```json
 {"pane_id":"%5","session":"tb-mobile","window_index":3,"window_name":"feat:x",
  "cwd":"/Users/you/dev/app","prev_cmd":"claude","agent":"claude",
- "uuid":"abc-…","uuid_source":"latest-jsonl","captured_at":"…",
+ "uuid":"abc-…","uuid_source":"pane-option","captured_at":"…",
  "first_user":"","last_assistant":"","dest_session":"","dest_window_name":""}
 ```
 
-Session ids are captured two ways: scraping the agent's farewell line from
-scrollback (high confidence, only on a clean interactive exit), or — the common
-case for unattended autosave — a **filesystem fallback** that finds the
-most-recent transcript for the pane's working directory.
+`uuid_source` is `"pane-option"` when the watcher already pinned the UUID, or
+`"latest-jsonl"` for the filesystem fallback (most-recent transcript for the
+pane's cwd). The watcher path is preferred — it's exact and collision-free even
+when multiple agents share the same working directory.
 
 Restore is keyed on a stable per-window marker (`@necro_id`), not window names
 (which auto-rename) — so repeated restores never stack duplicates.
