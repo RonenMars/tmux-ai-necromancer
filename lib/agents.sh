@@ -41,6 +41,33 @@ necro_agent_for_cmd() {
   return 0
 }
 
+# --- Per-cwd UUID cursor ----------------------------------------------------
+# File-based cursor so the index survives subshell boundaries (command substitution
+# forks a subshell; writes to an in-memory array would be lost on return).
+# Cursor files live in $NECRO_CURSOR_DIR (set by the snapshot script before sourcing).
+# Usage: necro_agent_pop_session_id "$agent" "$cwd" — prints next unused UUID.
+necro_agent_pop_session_id() {
+  local agent="$1" cwd="$2"
+  declare -f "agent_${agent}_all_session_ids" >/dev/null 2>&1 || return 0
+  # Cursor dir must be set by the caller (snapshot script sets NECRO_CURSOR_DIR).
+  local cursor_dir="${NECRO_CURSOR_DIR:-}"
+  [ -n "$cursor_dir" ] || return 0
+  # Safe filename: replace non-alnum with _.
+  local key; key="$(printf '%s:%s' "$agent" "$cwd" | tr -cs 'a-zA-Z0-9' '_')"
+  local cursor_file="$cursor_dir/$key"
+  local idx=0
+  [ -f "$cursor_file" ] && idx="$(cat "$cursor_file" 2>/dev/null || echo 0)"
+  local ids=()
+  while IFS= read -r id; do
+    [ -n "$id" ] && ids+=("$id")
+  done < <("agent_${agent}_all_session_ids" "$cwd" 2>/dev/null)
+  if [ "${#ids[@]}" -eq 0 ] || [ "$idx" -ge "${#ids[@]}" ]; then
+    return 0  # exhausted
+  fi
+  printf '%s' "${ids[$idx]}"
+  printf '%d' $(( idx + 1 )) > "$cursor_file"
+}
+
 # --- Dispatch wrappers ------------------------------------------------------
 # Each takes the agent name as the first arg and forwards the rest to the
 # adapter function. Returns empty/no-op when the adapter lacks the function.

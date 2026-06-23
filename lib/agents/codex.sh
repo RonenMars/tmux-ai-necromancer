@@ -25,12 +25,16 @@ agent_codex_project_dir() {
 # Returns "" if none found. Bounded to the 200 most-recent rollouts for speed.
 agent_codex_latest_session_id() {
   local cwd="$1"
+  agent_codex_all_session_ids "$cwd" | head -1
+}
+
+# All session ids for a cwd, newest-first, one per line.
+agent_codex_all_session_ids() {
+  local cwd="$1"
   [ -d "$CODEX_SESSIONS_DIR" ] || return 0
   local f
-  # Newest-first across the date-nested tree.
   while IFS= read -r f; do
     [ -n "$f" ] || continue
-    # The session_meta is the first line; read only it.
     local id
     id="$(head -1 "$f" 2>/dev/null | python3 -c '
 import sys, json
@@ -42,10 +46,7 @@ p = o.get("payload", o)
 if p.get("cwd") == sys.argv[1]:
     sys.stdout.write(p.get("id", ""))
 ' "$cwd" 2>/dev/null)"
-    if [ -n "$id" ]; then
-      printf '%s' "$id"
-      return 0
-    fi
+    [ -n "$id" ] && printf '%s\n' "$id"
   done <<EOF
 $(/bin/ls -t "$CODEX_SESSIONS_DIR"/*/*/*/rollout-*.jsonl 2>/dev/null | head -200)
 EOF

@@ -38,6 +38,18 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
 {
   echo "[$(necro_ts)] autosave started"
   "$SELF_DIR/necro-snapshot.sh" --idle-only 2>&1
+
+  # Summary: count records with/without UUIDs per agent for later debugging.
+  latest="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
+  if [ -f "$latest" ]; then
+    total=$(wc -l < "$latest" | tr -d ' ')
+    with_uuid=$(grep -c '"uuid":"[^"]' "$latest" 2>/dev/null || echo 0)
+    no_uuid=$(( total - with_uuid ))
+    agents_seen=$(grep -o '"agent":"[^"]*"' "$latest" 2>/dev/null \
+      | sort | uniq -c | tr '\n' ' ' || echo "none")
+    echo "[$(necro_ts)] summary: total=$total with_uuid=$with_uuid no_uuid=$no_uuid agents=[$agents_seen]"
+  fi
+
   echo "[$(necro_ts)] autosave complete"
 
   # Rotate: keep only the N most-recent autosave files. POSIX loop (runs under
@@ -48,6 +60,12 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
         rm -f "$f"
         echo "[$(necro_ts)] rotated old snapshot: $(basename "$f")"
       done
+
+  # ponytail: tail-based log rotation — keeps last 5000 lines, avoids unbounded growth
+  if [ -f "$LOG" ] && [ "$(wc -l < "$LOG")" -gt 5000 ]; then
+    tail -n 5000 "$LOG" > "${LOG}.tmp" && mv "${LOG}.tmp" "$LOG"
+    echo "[$(necro_ts)] log rotated to 5000 lines"
+  fi
 } >> "$LOG" 2>&1 &
 
 exit 0

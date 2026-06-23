@@ -22,11 +22,15 @@ agent_claude_project_dir() {
 # Most-recent session id (UUID) for a cwd via filesystem fallback ("" if none).
 agent_claude_latest_session_id() {
   local cwd="$1"
-  local proj_dir
+  agent_claude_all_session_ids "$cwd" | head -1
+}
+
+# All session ids for a cwd, newest-first, one per line.
+agent_claude_all_session_ids() {
+  local cwd="$1" proj_dir
   proj_dir="$(agent_claude_project_dir "$cwd")"
   [ -d "$proj_dir" ] || return 0
   /bin/ls -t "$proj_dir"/*.jsonl 2>/dev/null \
-    | head -1 \
     | xargs -n1 basename 2>/dev/null \
     | sed -nE "s/^($CLAUDE_UUID_RE)\.jsonl\$/\\1/p"
 }

@@ -88,13 +88,24 @@ wait_for_shell() {
   printf '%s' "$cmd"; return 1
 }
 
-# Resolve a session id for an idle/skipped/idle-only pane: scrape then fallback.
+# Resolve a session id for an idle/skipped/idle-only pane.
+# For live agents uses pop (advances cursor so duplicate cwds get different UUIDs).
+# For idle shells falls back to latest (no cursor needed — agent is gone).
 resolve_fallback_id() {
-  local agent="$1" cwd="$2"
-  necro_agent_latest_session_id "$agent" "$cwd" 2>/dev/null || true
+  local agent="$1" cwd="$2" live="${3:-0}"
+  if [ "$live" = "1" ]; then
+    necro_agent_pop_session_id "$agent" "$cwd" 2>/dev/null || true
+  else
+    necro_agent_latest_session_id "$agent" "$cwd" 2>/dev/null || true
+  fi
 }
 
 # --- Main -------------------------------------------------------------------
+# Temp dir for per-cwd UUID cursors (file-based so they survive subshells).
+NECRO_CURSOR_DIR="$(mktemp -d)"
+trap 'rm -rf "$NECRO_CURSOR_DIR"' EXIT
+export NECRO_CURSOR_DIR
+
 echo "Snapshot will be written to: $OUT"
 echo
 
@@ -135,9 +146,9 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
     continue
   fi
 
-  # Live agent + --idle-only: capture via fallback, never disturb the pane.
+  # Live agent + --idle-only: pop next UUID for this cwd (handles multiple panes).
   if [ "$IDLE_ONLY" = "1" ]; then
-    fb="$(resolve_fallback_id "$agent" "$cwd")"
+    fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
     if [ -n "$fb" ]; then
       echo "  --idle-only ($agent) — fallback id: $fb"
       emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl"
@@ -161,7 +172,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
   case "$ans" in
     q|Q) echo "  aborted by user"; break ;;
     s|S|n|N)
-      fb="$(resolve_fallback_id "$agent" "$cwd")"
+      fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
       if [ -n "$fb" ]; then
         echo "  skipped — fallback id: $fb"
         emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl"
