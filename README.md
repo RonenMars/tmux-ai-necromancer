@@ -1,5 +1,7 @@
 # tmux-ai-necromancer 🪦
 
+![tmux-ai-necromancer](assets/github-banner-v2.png)
+
 > Bring your dead AI coding sessions back to life.
 
 `tmux-ai-necromancer` is a [TPM](https://github.com/tmux-plugins/tpm)-compatible
