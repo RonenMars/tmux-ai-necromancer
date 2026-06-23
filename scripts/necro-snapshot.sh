@@ -122,16 +122,22 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
 
   agent="$(necro_agent_for_cmd "$cmd")"
 
-  # Idle shell — agent may have just exited; try fallback for every agent.
+  # Idle shell — agent may have just exited; try pane option first, then fallback for every agent.
   if necro_is_idle_shell "$cmd"; then
-    found_uuid=""; found_agent=""
-    for a in $(necro_enabled_agents); do
-      fb="$(resolve_fallback_id "$a" "$cwd")"
-      if [ -n "$fb" ]; then found_uuid="$fb"; found_agent="$a"; break; fi
-    done
+    # Watcher may have pinned a UUID before the agent exited.
+    found_uuid="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
+    found_agent="$(tmux show-option -pqv -t "$pane_id" @necro_agent 2>/dev/null || true)"
+    found_source="pane-option"
+    if [ -z "$found_uuid" ]; then
+      found_uuid=""; found_agent=""
+      for a in $(necro_enabled_agents); do
+        fb="$(resolve_fallback_id "$a" "$cwd")"
+        if [ -n "$fb" ]; then found_uuid="$fb"; found_agent="$a"; found_source="latest-jsonl"; break; fi
+      done
+    fi
     if [ -n "$found_uuid" ]; then
-      echo "  idle shell — fallback id ($found_agent): $found_uuid"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$found_agent" "$found_uuid" "latest-jsonl"
+      echo "  idle shell — ${found_source} id ($found_agent): $found_uuid"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$found_agent" "$found_uuid" "$found_source"
     else
       echo "  idle shell — no session found, recording without id"
       emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "" "" ""
@@ -146,12 +152,17 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
     continue
   fi
 
-  # Live agent + --idle-only: pop next UUID for this cwd (handles multiple panes).
+  # Live agent + --idle-only: read watcher-pinned UUID first, then cursor pop.
   if [ "$IDLE_ONLY" = "1" ]; then
-    fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
+    fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
+    fb_source="pane-option"
+    if [ -z "$fb" ]; then
+      fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
+      fb_source="latest-jsonl"
+    fi
     if [ -n "$fb" ]; then
-      echo "  --idle-only ($agent) — fallback id: $fb"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl"
+      echo "  --idle-only ($agent) — ${fb_source}: $fb"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "$fb_source"
     else
       echo "  --idle-only ($agent) — no session found, recording without id"
       emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" ""
