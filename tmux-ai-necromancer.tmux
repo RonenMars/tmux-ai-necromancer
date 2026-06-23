@@ -20,10 +20,11 @@ set_default() {
   fi
 }
 
-set_default "@necromancer_interval"      "5"
-set_default "@necromancer_max_snapshots" "20"
-set_default "@necromancer_agents"        "claude codex"
-set_default "@necromancer_restore_key"   "R"
+set_default "@necromancer_interval"        "5"
+set_default "@necromancer_max_snapshots"   "20"
+set_default "@necromancer_agents"          "claude codex"
+set_default "@necromancer_claude_commands" "claude"
+set_default "@necromancer_restore_key"     "R"
 
 AUTOSAVE="$CURRENT_DIR/scripts/necro-autosave.sh"
 

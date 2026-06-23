@@ -9,8 +9,16 @@
 CLAUDE_UUID_RE='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 # Does this pane's foreground command belong to Claude Code?
+# Checks against @necromancer_claude_commands (space-separated, default "claude").
 agent_claude_matches() {
-  [ "$1" = "claude" ]
+  local cmd="$1" name
+  local cmds
+  cmds="$(tmux show-option -gqv @necromancer_claude_commands 2>/dev/null)"
+  cmds="${cmds:-claude}"
+  for name in $cmds; do
+    [ "$cmd" = "$name" ] && return 0
+  done
+  return 1
 }
 
 # Per-project transcript directory for a cwd ("" if none).
