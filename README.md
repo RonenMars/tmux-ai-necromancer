@@ -1,4 +1,4 @@
-# tmux-ai-necromancer 🪦
+# 🪦 tmux-ai-necromancer 🪦
 
 <img src="banner/github-banner.svg" width="100%" alt="tmux-ai-necromancer banner">
 
