@@ -52,8 +52,8 @@ conflicts with an already-live server's session state during post-reboot restore
 **Fix:** Open a terminal emulator that is *not* inside tmux (e.g. a new iTerm2
 or Tabby window not attached to a session), then run `necro-resume` there.
 
-This applies to `necro-menu` too — since it calls `necro-reboot-resume.sh`
-internally, it inherits the same restriction. Run it from outside tmux.
+`necro-menu` does **not** have this restriction — it calls `necro-restore.sh`
+directly (no `$TMUX` guard), so you can run it from inside or outside tmux.
 
 ---
 
