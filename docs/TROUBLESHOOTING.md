@@ -23,7 +23,13 @@ Add them once to your shell config (already in
 
 **Manual recovery from an older snapshot:**
 
-If you already rebooted without prep, pick the last pre-reboot autosave:
+If you already rebooted without prep, use the interactive menu (easiest):
+
+```bash
+necro-menu   # option 2 → pick the snapshot just before the shutdown timestamp
+```
+
+Or restore directly:
 
 ```bash
 ls -lt ~/.claude/tmux-snapshots/*.idle-only.jsonl | head -10
@@ -45,6 +51,9 @@ conflicts with an already-live server's session state during post-reboot restore
 
 **Fix:** Open a terminal emulator that is *not* inside tmux (e.g. a new iTerm2
 or Tabby window not attached to a session), then run `necro-resume` there.
+
+This applies to `necro-menu` too — since it calls `necro-reboot-resume.sh`
+internally, it inherits the same restriction. Run it from outside tmux.
 
 ---
 
