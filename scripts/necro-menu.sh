@@ -108,16 +108,35 @@ action_resume_backup() {
   echo ""
   necro_say "Dry-run preview:"
   "$SELF_DIR/necro-restore.sh" --dry-run "$chosen"
+
+  # Show current tmux state and offer to clean up before restoring.
+  echo ""
+  necro_say "Current tmux sessions:"
+  tmux list-sessions 2>/dev/null | while IFS= read -r sess_line; do
+    local sess_name
+    sess_name="$(printf '%s' "$sess_line" | cut -d: -f1)"
+    printf '  %-30s\n' "$sess_line"
+    tmux list-windows -t "=$sess_name" -F "      #{window_index}: #{window_name}" 2>/dev/null
+  done
+  echo ""
+  printf 'Kill ALL current tmux sessions before restoring? [y/N] '
+  read -r kill_confirm
+  case "$kill_confirm" in
+    y|Y)
+      necro_say "Killing all sessions..."
+      tmux list-sessions -F '#{session_name}' 2>/dev/null | while IFS= read -r s; do
+        tmux kill-session -t "=$s" 2>/dev/null && echo "  killed: $s"
+      done
+      necro_ok "All sessions killed."
+      ;;
+    *) necro_say "Keeping existing sessions — restore will add windows alongside them." ;;
+  esac
+
   echo ""
   printf 'Restore this snapshot? [y/N] '
   read -r confirm
   case "$confirm" in
-    y|Y)
-      if [ -n "${TMUX:-}" ]; then
-        necro_warn "You're inside tmux — restore will add windows to existing sessions."
-      fi
-      "$SELF_DIR/necro-restore.sh" "$chosen"
-      ;;
+    y|Y) "$SELF_DIR/necro-restore.sh" "$chosen" ;;
     *) necro_say "Cancelled." ;;
   esac
 }
