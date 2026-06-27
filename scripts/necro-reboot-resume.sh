@@ -48,12 +48,13 @@ fi
 command -v tmux >/dev/null || { necro_err "tmux not installed."; exit 1; }
 
 if [ -z "$SNAPSHOT" ]; then
-  if [ ! -e "$POINTER" ]; then
-    necro_err "No pointer at $POINTER. Pass a snapshot path explicitly, or run"
-    necro_err "necro-restore.sh which auto-picks the latest autosave."
-    exit 1
+  if [ -e "$POINTER" ]; then
+    SNAPSHOT="$(readlink -f "$POINTER" 2>/dev/null || cat "$POINTER")"
+  else
+    necro_warn "No reboot pointer found — falling back to latest autosave."
+    SNAPSHOT="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
+    [ -n "$SNAPSHOT" ] || { necro_err "No autosave snapshots found in $SNAP_DIR."; exit 1; }
   fi
-  SNAPSHOT="$(readlink -f "$POINTER" 2>/dev/null || cat "$POINTER")"
 fi
 [ -f "$SNAPSHOT" ] || { necro_err "Snapshot not found: $SNAPSHOT"; exit 1; }
 

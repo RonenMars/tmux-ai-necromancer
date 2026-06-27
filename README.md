@@ -73,13 +73,38 @@ run-shell ~/.tmux/plugins/tmux-ai-necromancer/tmux-ai-necromancer.tmux  # in tmu
 | Manual snapshot (no disruption) | `necro-snapshot.sh --idle-only` |
 | Restore a specific snapshot | `necro-restore.sh <file.jsonl>` |
 | Dry-run a restore | `necro-restore.sh --dry-run` |
-| Before reboot | `necro-reboot-prep.sh` |
+| Before reboot | `necro-reboot-prep.sh` (or `safe-reboot` / `safe-shutdown` aliases) |
 | After reboot | `necro-reboot-resume.sh` |
+| Interactive menu | `necro-menu.sh` |
 | Session viewer | `make -C tui run` |
 
 Scripts live in `scripts/` inside the plugin dir
 (`~/.tmux/plugins/tmux-ai-necromancer/scripts/`). Add it to `PATH` or alias the
 ones you use.
+
+### Recommended shell aliases
+
+Add these to your shell config (`~/.zshrc`, `~/.bashrc`, `config.fish`, etc.):
+
+```sh
+# post-reboot: restore all AI sessions from last snapshot
+alias necro-resume='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-reboot-resume.sh'
+
+# interactive menu: browse/restore/cleanup snapshots, prep for reboot
+alias necro-menu='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-menu.sh'
+
+# safe reboot/shutdown: snapshot all live sessions FIRST, then hand off to the OS.
+# Use these instead of the Apple menu / system shutdown — see docs/TROUBLESHOOTING.md.
+alias safe-reboot='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-reboot-prep.sh && sudo reboot'
+alias safe-shutdown='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-reboot-prep.sh && sudo shutdown -h now'
+```
+
+> **Why `safe-reboot`?** The autosave runs every 5 minutes. If you close
+> sessions manually before rebooting — or macOS starts killing processes during
+> shutdown — the final autosave captures only what was still alive at that
+> moment. `safe-reboot` runs `necro-reboot-prep.sh` first, snapshotting
+> everything while all sessions are still open, then reboots. See
+> [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) for details.
 
 ## Configuration
 
@@ -137,6 +162,12 @@ Restore is keyed on a stable per-window marker (`@necro_id`), not window names
 | Codex | `~/.codex/sessions/<date>/rollout-*-<uuid>.jsonl` | `codex resume <uuid>` |
 
 Want another agent? See [`docs/agents.md`](docs/agents.md) — it's one file.
+
+## Troubleshooting
+
+See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for common issues:
+sessions missing after reboot, the "inside tmux" guard, partial autosaves, and
+idempotency behavior.
 
 ## License
 

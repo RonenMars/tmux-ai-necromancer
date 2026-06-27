@@ -32,6 +32,11 @@ now="$(date +%s)"
 next_run=$(( last_saved + interval_seconds ))
 [ "$now" -lt "$next_run" ] && exit 0
 
+# ponytail: skip autosave during first 90s of uptime — avoids snapshotting a
+# half-restored server right after boot before necro-resume has run.
+boot_time="$(sysctl -n kern.boottime 2>/dev/null | grep -o 'sec = [0-9]*' | awk '{print $3}')"
+if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then exit 0; fi
+
 # ponytail: mkdir is atomic — guarantees only one concurrent status-right fires
 LOCK_DIR="$SNAP_DIR/.autosave.lock"
 mkdir "$LOCK_DIR" 2>/dev/null || exit 0

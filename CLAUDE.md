@@ -105,6 +105,12 @@ Key things to verify after any change to restore/snapshot:
 - multi-agent: a `codex` record yields `codex resume <id>`
 - autosave log has no `mapfile` errors and honors `@necromancer_max_snapshots`
 
+## Troubleshooting
+
+See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for known failure modes
+and their fixes. Key one: **sessions missing after reboot** — use `safe-reboot` /
+`safe-shutdown` aliases instead of the Apple menu.
+
 ## Conventions
 
 - Conventional-commit titles (`feat:`, `fix:`, `docs:`, …).
