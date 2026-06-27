@@ -17,16 +17,28 @@ SNAP_DIR="$(necro_snapshot_dir)"
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 list_snapshots() {
-  /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null
+  /bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null | grep -v 'enriched'
+}
+
+list_all_snapshots() {
+  /bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null
 }
 
 snapshot_summary() {
   local f="$1"
-  local ts records agents
-  ts="$(basename "$f" .idle-only.jsonl | sed 's/T/ /' | sed 's/-/:/4' | sed 's/-/:/4')"
+  local name records agents kind ts
+  name="$(basename "$f" .jsonl)"
+  # detect kind from suffix
+  case "$name" in
+    *.idle-only) kind="autosave"; ts="${name%.idle-only}" ;;
+    *.enriched)  kind="reboot  "; ts="${name%.enriched}" ;;
+    *)           kind="snapshot"; ts="$name" ;;
+  esac
+  ts="$(printf '%s' "$ts" | sed 's/T/ /' | sed 's/-/:/4' | sed 's/-/:/4')"
   records="$(wc -l < "$f" | tr -d ' ')"
+  sessions="$(grep -o '"session":"[^"]*"' "$f" 2>/dev/null | sort -u | wc -l | tr -d ' ')"
   agents="$(grep -o '"agent":"[^"]*"' "$f" 2>/dev/null | grep -v '""' | sort | uniq -c | tr '\n' ' ' || echo '')"
-  printf '  %-28s  %3s records  %s\n' "$ts" "$records" "$agents"
+  printf '  %-10s  %-24s  %2s sessions  %3s panes  %s\n' "$kind" "$ts" "$sessions" "$records" "$agents"
 }
 
 prompt_choice() {
@@ -49,27 +61,30 @@ prompt_choice() {
 action_list_backups() {
   necro_hr
   necro_say "Existing snapshots"
-  local snaps
-  snaps="$(list_snapshots)"
+  local snaps pointer="$SNAP_DIR/latest-for-reboot"
+  snaps="$(list_all_snapshots)"
   if [ -z "$snaps" ]; then
     echo "  No snapshots found in $SNAP_DIR"
     return
   fi
   local i=1
   while IFS= read -r f; do
-    printf '  [%2d] ' "$i"
+    local marker="   "
+    [ -e "$pointer" ] && [ "$(readlink -f "$pointer" 2>/dev/null || cat "$pointer")" = "$f" ] && marker="(*)"
+    printf '  [%2d]%s ' "$i" "$marker"
     snapshot_summary "$f"
     i=$(( i + 1 ))
   done <<< "$snaps"
   echo ""
   echo "  Total: $(echo "$snaps" | wc -l | tr -d ' ') snapshots in $SNAP_DIR"
+  [ -e "$pointer" ] && echo "  (*) = pinned reboot target"
 }
 
 action_resume_backup() {
   necro_hr
   necro_say "Resume a specific snapshot"
   local snaps
-  snaps="$(list_snapshots)"
+  snaps="$(list_all_snapshots)"
   if [ -z "$snaps" ]; then
     echo "  No snapshots found."; return
   fi
@@ -245,7 +260,7 @@ while true; do
   necro_hr
   necro_say "tmux-ai-necromancer"
   echo "  Snapshot dir: $SNAP_DIR"
-  local_count="$(list_snapshots | wc -l | tr -d ' ')"
+  local_count="$(list_all_snapshots | wc -l | tr -d ' ')"
   echo "  Snapshots:    $local_count"
   echo ""
   echo "  [1] List backups"
