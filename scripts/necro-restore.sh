@@ -70,6 +70,21 @@ command -v jq   >/dev/null || { necro_err "jq not installed (brew install jq).";
 
 stage() { printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
 
+progress_record() {
+  local current="$1" total="$2" message="$3"
+  local pct=0 width=20 filled empty bar
+  [ "$total" -gt 0 ] && pct=$((current * 100 / total))
+  if [ "$DRY_RUN" = "0" ] && [ -t 1 ]; then
+    filled=$((pct * width / 100))
+    empty=$((width - filled))
+    bar="$(printf '%*s' "$filled" '' | tr ' ' '#')"
+    bar="$bar$(printf '%*s' "$empty" '' | tr ' ' '-')"
+    printf '[%s] %3d%%  [%d/%d] %s\n' "$bar" "$pct" "$current" "$total" "$message"
+  else
+    printf '[%d/%d %3d%%] %s\n' "$current" "$total" "$pct" "$message"
+  fi
+}
+
 format_bytes() {
   local bytes="${1:-0}"
   awk -v b="$bytes" 'BEGIN {
@@ -204,11 +219,8 @@ while IFS= read -r line; do
   [ -z "$line" ] && continue
   i=$((i + 1))
 
-  pct=0
-  [ "$total_records" -gt 0 ] && pct=$((i * 100 / total_records))
-
   if ! jq -e . >/dev/null 2>&1 <<<"$line"; then
-    printf '[%d/%d %3d%%] skipping invalid JSON record\n' "$i" "$total_records" "$pct"
+    progress_record "$i" "$total_records" "skipping invalid JSON record"
     invalid=$((invalid + 1))
     skipped=$((skipped + 1))
     continue
@@ -222,13 +234,13 @@ while IFS= read -r line; do
   uuid=$(jq -r '.uuid // empty' <<<"$line")
 
   if [ -z "$session" ] || [ -z "$cwd" ]; then
-    printf '[%d/%d %3d%%] skipping record: missing session or cwd\n' "$i" "$total_records" "$pct"
+    progress_record "$i" "$total_records" "skipping record: missing session or cwd"
     skipped=$((skipped + 1))
     continue
   fi
 
   if [ "$ALLOW_UNSAFE_CWD" = "0" ] && reason="$(unsafe_cwd_reason "$cwd")"; then
-    printf '[%d/%d %3d%%] skipping %s/%s: %s (cwd=%s)\n' "$i" "$total_records" "$pct" "$session" "${win_name:-?}" "$reason" "$cwd"
+    progress_record "$i" "$total_records" "skipping $session/${win_name:-?}: $reason (cwd=$cwd)"
     skipped=$((skipped + 1))
     continue
   fi
@@ -238,8 +250,7 @@ while IFS= read -r line; do
   safe_name="$(printf '%s' "$safe_name" | sed -e 's/[[:space:]⚡]*$//' -e 's#/#-#g')"
   [ -z "$safe_name" ] && safe_name="$(basename "$cwd")"
 
-  printf '[%d/%d %3d%%] restoring %s/%s  (agent=%s cwd=%s)\n' \
-    "$i" "$total_records" "$pct" "$session" "$safe_name" "${agent:-none}" "$cwd"
+  progress_record "$i" "$total_records" "restoring $session/$safe_name  (agent=${agent:-none} cwd=$cwd)"
 
   # Per-record stable marker. Falls back to pane_id when there's no uuid.
   mark="${cwd}|${uuid:-$pane_id}"
