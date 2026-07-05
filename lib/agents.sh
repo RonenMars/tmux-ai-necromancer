@@ -96,6 +96,18 @@ necro_agent_resume_cmd() {
   "agent_${agent}_resume_cmd" "$@"
 }
 
+necro_agent_transcript_path() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_transcript_path" >/dev/null 2>&1 || return 0
+  "agent_${agent}_transcript_path" "$@"
+}
+
+necro_agent_transcript_size() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_transcript_size" >/dev/null 2>&1 || return 0
+  "agent_${agent}_transcript_size" "$@"
+}
+
 necro_agent_exit_keys() {
   local agent="$1"; shift
   declare -f "agent_${agent}_exit_keys" >/dev/null 2>&1 || return 0

@@ -31,10 +31,14 @@ necro_load_agents
 SNAP_DIR="$(necro_snapshot_dir)"
 SNAPSHOT=""
 DRY_RUN=0
+FORCE_LARGE=0
+ALLOW_UNSAFE_CWD=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
+    --force-large) FORCE_LARGE=1; shift ;;
+    --allow-unsafe-cwd) ALLOW_UNSAFE_CWD=1; shift ;;
     -h|--help)
       cat <<'H'
 necro-restore.sh — recreate AI-agent tmux sessions from a snapshot.
@@ -43,6 +47,15 @@ Usage:
   necro-restore.sh                  use most-recent autosave snapshot
   necro-restore.sh <snapshot.jsonl> use a specific snapshot
   necro-restore.sh --dry-run        print the plan, change nothing
+  necro-restore.sh --force-large    resume Claude transcripts over the size limit
+  necro-restore.sh --allow-unsafe-cwd
+
+Config:
+  NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES or @necromancer_max_claude_transcript_bytes
+      Defaults to 52428800 (50 MiB).
+  NECROMANCER_UNSAFE_CWD_PATTERNS or @necromancer_unsafe_cwd_patterns
+      Space-separated shell globs. Defaults to:
+      /private/tmp/claude-* *tmux-debug-build* *crashtest*
 
 Idempotent: reuses existing sessions/windows; resumes only into fresh panes.
 H
@@ -55,18 +68,94 @@ done
 command -v tmux >/dev/null || { necro_err "tmux not installed."; exit 1; }
 command -v jq   >/dev/null || { necro_err "jq not installed (brew install jq)."; exit 1; }
 
+stage() { printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
+
+format_bytes() {
+  local bytes="${1:-0}"
+  awk -v b="$bytes" 'BEGIN {
+    if (b >= 1048576) printf "%.1f MiB", b / 1048576;
+    else if (b >= 1024) printf "%.1f KiB", b / 1024;
+    else printf "%d B", b;
+  }'
+}
+
+max_claude_transcript_bytes() {
+  local val
+  if [ -n "${NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES:-}" ]; then
+    val="$NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES"
+  else
+    val="$(necro_tmux_option @necromancer_max_claude_transcript_bytes "52428800")"
+  fi
+  case "$val" in
+    ''|*[!0-9]*) printf '52428800' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+unsafe_cwd_patterns() {
+  local val
+  if [ "${NECROMANCER_UNSAFE_CWD_PATTERNS+x}" = "x" ]; then
+    val="$NECROMANCER_UNSAFE_CWD_PATTERNS"
+  else
+    val="$(necro_tmux_option @necromancer_unsafe_cwd_patterns "")"
+    [ -n "$val" ] || val="/private/tmp/claude-* *tmux-debug-build* *crashtest*"
+  fi
+  [ "$val" = "none" ] && return 0
+  printf '%s' "$val"
+}
+
+unsafe_cwd_reason() {
+  local cwd="$1" pattern patterns
+  patterns="$(unsafe_cwd_patterns)"
+  for pattern in $patterns; do
+    case "$cwd" in
+      $pattern) printf 'unsafe cwd matches %s' "$pattern"; return 0 ;;
+    esac
+  done
+  return 1
+}
+
+claude_resume_skip_reason() {
+  local uuid="$1" cwd="$2" max_bytes="$3" path size
+  path="$(necro_agent_transcript_path claude "$uuid" "$cwd")"
+  if [ -n "$path" ]; then
+    echo "  claude transcript: $path" >&2
+  fi
+  size="$(necro_agent_transcript_size claude "$uuid" "$cwd")"
+  if [ -n "$size" ]; then
+    echo "  claude transcript size: $(format_bytes "$size") ($size bytes)" >&2
+    if [ "$FORCE_LARGE" = "0" ] && [ "$size" -gt "$max_bytes" ]; then
+      printf 'Claude transcript is larger than %s; pass --force-large to resume' "$(format_bytes "$max_bytes")"
+      return 0
+    fi
+  else
+    echo "  claude transcript size: unknown or missing" >&2
+  fi
+  return 1
+}
+
 # Resolve snapshot: explicit arg, else newest autosave, else newest of any.
+stage 1 5 "resolving snapshot"
 if [ -z "$SNAPSHOT" ]; then
   SNAPSHOT="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
   [ -z "$SNAPSHOT" ] && SNAPSHOT="$(/bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null | grep -v enriched | head -1)"
 fi
 [ -f "$SNAPSHOT" ] || { necro_err "No snapshot found (looked in $SNAP_DIR)."; exit 1; }
 
+stage 2 5 "reading snapshot"
+total_records="$(grep -cve '^[[:space:]]*$' "$SNAPSHOT" 2>/dev/null || true)"
+total_records="${total_records:-0}"
+max_claude_bytes="$(max_claude_transcript_bytes)"
+
 necro_hr
 necro_say "Necromancer restore"
 echo "  Snapshot: $SNAPSHOT"
-echo "  Records:  $(wc -l < "$SNAPSHOT" | tr -d ' ')"
+echo "  Records:  $total_records"
 echo "  Dry-run:  $DRY_RUN"
+echo "  Max Claude transcript: $(format_bytes "$max_claude_bytes") ($max_claude_bytes bytes)"
+echo "  Force large Claude transcripts: $FORCE_LARGE"
+echo "  Allow unsafe cwd paths: $ALLOW_UNSAFE_CWD"
+echo "  Unsafe cwd patterns: $(unsafe_cwd_patterns || true)"
 necro_hr
 
 run() { if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
@@ -106,10 +195,24 @@ ensure_session() {
   printf '1'  # session freshly created
 }
 
-restored=0; skipped=0; resumed=0
+stage 3 5 "validating records"
+restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; i=0
+
+stage 4 5 "restoring windows and resuming agents"
 
 while IFS= read -r line; do
   [ -z "$line" ] && continue
+  i=$((i + 1))
+
+  pct=0
+  [ "$total_records" -gt 0 ] && pct=$((i * 100 / total_records))
+
+  if ! jq -e . >/dev/null 2>&1 <<<"$line"; then
+    printf '[%d/%d %3d%%] skipping invalid JSON record\n' "$i" "$total_records" "$pct"
+    invalid=$((invalid + 1))
+    skipped=$((skipped + 1))
+    continue
+  fi
 
   session=$(jq -r '.session // empty' <<<"$line")
   pane_id=$(jq -r '.pane_id // empty' <<<"$line")
@@ -118,12 +221,25 @@ while IFS= read -r line; do
   agent=$(jq -r '.agent // empty' <<<"$line")
   uuid=$(jq -r '.uuid // empty' <<<"$line")
 
+  if [ -z "$session" ] || [ -z "$cwd" ]; then
+    printf '[%d/%d %3d%%] skipping record: missing session or cwd\n' "$i" "$total_records" "$pct"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
+  if [ "$ALLOW_UNSAFE_CWD" = "0" ] && reason="$(unsafe_cwd_reason "$cwd")"; then
+    printf '[%d/%d %3d%%] skipping %s/%s: %s (cwd=%s)\n' "$i" "$total_records" "$pct" "$session" "${win_name:-?}" "$reason" "$cwd"
+    skipped=$((skipped + 1))
+    continue
+  fi
+
   # Sanitize window name: tmux disallows '/' in -t targets; trim noise.
   safe_name="${win_name%%:*}"
   safe_name="$(printf '%s' "$safe_name" | sed -e 's/[[:space:]⚡]*$//' -e 's#/#-#g')"
   [ -z "$safe_name" ] && safe_name="$(basename "$cwd")"
 
-  echo "[$session] $safe_name  (agent=${agent:-none} cwd=$cwd)"
+  printf '[%d/%d %3d%%] restoring %s/%s  (agent=%s cwd=%s)\n' \
+    "$i" "$total_records" "$pct" "$session" "$safe_name" "${agent:-none}" "$cwd"
 
   # Per-record stable marker. Falls back to pane_id when there's no uuid.
   mark="${cwd}|${uuid:-$pane_id}"
@@ -135,7 +251,7 @@ while IFS= read -r line; do
   # first record instead of adding a second.
   if window_marked "$session" "$mark"; then
     echo "  already restored (marker) — reusing"
-    skipped=$((skipped + 1))
+    reused=$((reused + 1))
     fresh=0
     window_id="$(window_id_for_mark "$session" "$mark")"
   elif [ "$session_fresh" = "1" ]; then
@@ -164,17 +280,31 @@ while IFS= read -r line; do
   # window already has its agent running (or the user's own work) — don't
   # double-resume, which would violate one-client-per-conversation.
   if [ "$fresh" = "1" ] && [ -n "$agent" ] && [ -n "$uuid" ]; then
+    echo "  uuid: $uuid"
+    if [ "$agent" = "claude" ] && reason="$(claude_resume_skip_reason "$uuid" "$cwd" "$max_claude_bytes")"; then
+      echo "  skip resume: $reason"
+      resume_skipped=$((resume_skipped + 1))
+      skipped=$((skipped + 1))
+      continue
+    fi
     resume_cmd="$(necro_agent_resume_cmd "$agent" "$uuid")"
     if [ -n "$resume_cmd" ]; then
       echo "  resume: $resume_cmd"
       run tmux send-keys -t "$target" "$resume_cmd" Enter
       resumed=$((resumed + 1))
+    else
+      echo "  skip resume: no resume command for agent '$agent'"
+      resume_skipped=$((resume_skipped + 1))
     fi
   elif [ "$fresh" = "0" ]; then
     echo "  reused — leaving running agent untouched"
+  elif [ -z "$agent" ] || [ -z "$uuid" ]; then
+    echo "  skip resume: missing agent or uuid"
+    resume_skipped=$((resume_skipped + 1))
   fi
 done < "$SNAPSHOT"
 
+stage 5 5 "cleanup"
 necro_hr
-necro_ok "Done. windows added: $restored, reused: $skipped, agents resumed: $resumed"
+necro_ok "Done. windows added: $restored, reused: $reused, agents resumed: $resumed, resume skipped: $resume_skipped, records skipped: $skipped, invalid: $invalid"
 [ "$DRY_RUN" = "1" ] || tmux list-sessions 2>/dev/null || true
