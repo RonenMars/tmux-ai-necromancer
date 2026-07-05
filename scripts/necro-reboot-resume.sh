@@ -49,7 +49,7 @@ command -v tmux >/dev/null || { necro_err "tmux not installed."; exit 1; }
 
 if [ -z "$SNAPSHOT" ]; then
   if [ -e "$POINTER" ]; then
-    SNAPSHOT="$(readlink -f "$POINTER" 2>/dev/null || cat "$POINTER")"
+    SNAPSHOT="$(readlink -f "$POINTER" 2>/dev/null || readlink "$POINTER")"
   else
     necro_warn "No reboot pointer found — falling back to latest autosave."
     SNAPSHOT="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
@@ -85,7 +85,7 @@ necro_hr
 # ── Phase 2: restore ────────────────────────────────────────────────────────
 necro_say "Phase 2: necro-restore.sh"
 restore_flags=(); (( DRY_RUN )) && restore_flags+=(--dry-run)
-"$SELF_DIR/necro-restore.sh" "${restore_flags[@]}" "$SNAPSHOT"
+"$SELF_DIR/necro-restore.sh" ${restore_flags[@]+"${restore_flags[@]}"} "$SNAPSHOT"
 necro_hr
 
 if [ "$DRY_RUN" = "0" ] && [ "$KEEP_POINTER" = "0" ] && [ -e "$POINTER" ]; then

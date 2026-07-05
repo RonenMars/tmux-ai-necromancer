@@ -73,7 +73,7 @@ if (( DRY_RUN )); then
   necro_say "DRY-RUN: would run necro-snapshot.sh ${snap_flags[*]}"
   SNAPSHOT_FILE="<would-be-created>"
 else
-  "$SELF_DIR/necro-snapshot.sh" "${snap_flags[@]}"
+  "$SELF_DIR/necro-snapshot.sh" ${snap_flags[@]+"${snap_flags[@]}"}
   if [ "$MODE" = "idle-only" ]; then
     SNAPSHOT_FILE="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
   else

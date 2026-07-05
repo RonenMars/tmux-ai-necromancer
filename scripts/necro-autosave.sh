@@ -34,7 +34,7 @@ next_run=$(( last_saved + interval_seconds ))
 
 # ponytail: skip autosave during first 90s of uptime — avoids snapshotting a
 # half-restored server right after boot before necro-resume has run.
-boot_time="$(sysctl -n kern.boottime 2>/dev/null | grep -o 'sec = [0-9]*' | awk '{print $3}')"
+boot_time="$(sysctl -n kern.boottime 2>/dev/null | sed -n 's/.*{ sec = \([0-9][0-9]*\),.*/\1/p')"
 if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then exit 0; fi
 
 # ponytail: mkdir is atomic — guarantees only one concurrent status-right fires
@@ -51,7 +51,8 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
   latest="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
   if [ -f "$latest" ]; then
     total=$(wc -l < "$latest" | tr -d ' ')
-    with_uuid=$(grep -c '"uuid":"[^"]' "$latest" 2>/dev/null || echo 0)
+    with_uuid=$(grep -c '"uuid":"[^"]' "$latest" 2>/dev/null || true)
+    with_uuid=${with_uuid:-0}
     no_uuid=$(( total - with_uuid ))
     agents_seen=$(grep -o '"agent":"[^"]*"' "$latest" 2>/dev/null \
       | sort | uniq -c | tr '\n' ' ' || echo "none")
@@ -72,7 +73,7 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
 
   # Rotate: keep only the N most-recent autosave files. POSIX loop (runs under
   # /bin/sh via tmux — no `mapfile`).
-  /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null \
+  /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl "$SNAP_DIR"/*.enriched.jsonl 2>/dev/null \
     | tail -n "+$(( max_snapshots + 1 ))" \
     | while IFS= read -r f; do
         rm -f "$f"

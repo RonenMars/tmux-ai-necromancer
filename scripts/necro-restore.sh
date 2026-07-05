@@ -98,9 +98,11 @@ ensure_session() {
     printf '0'  # session pre-existed
     return 0
   fi
-  necro_say "creating session '$session' (cwd=$cwd)"
-  run tmux new-session -d -s "$session" -c "$cwd" -n "$name" || \
-    necro_warn "could not create session '$session'"
+  {
+    necro_say "creating session '$session' (cwd=$cwd)"
+    run tmux new-session -d -s "$session" -c "$cwd" -n "$name" || \
+      necro_warn "could not create session '$session'"
+  } >&2
   printf '1'  # session freshly created
 }
 
@@ -110,6 +112,7 @@ while IFS= read -r line; do
   [ -z "$line" ] && continue
 
   session=$(jq -r '.session // empty' <<<"$line")
+  pane_id=$(jq -r '.pane_id // empty' <<<"$line")
   win_name=$(jq -r '.window_name // empty' <<<"$line")
   cwd=$(jq -r '.cwd // empty' <<<"$line")
   agent=$(jq -r '.agent // empty' <<<"$line")
@@ -122,8 +125,8 @@ while IFS= read -r line; do
 
   echo "[$session] $safe_name  (agent=${agent:-none} cwd=$cwd)"
 
-  # Per-record stable marker. Falls back to cwd alone when there's no uuid.
-  mark="${cwd}|${uuid}"
+  # Per-record stable marker. Falls back to pane_id when there's no uuid.
+  mark="${cwd}|${uuid:-$pane_id}"
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
 

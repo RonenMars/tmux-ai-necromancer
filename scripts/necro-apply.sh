@@ -80,10 +80,10 @@ while IFS= read -r line; do
   fi
 
   if [ -n "$agent" ] && [ -n "$uuid" ]; then
-    cur="$(tmux display-message -p -t "${window_id}.1" '#{pane_current_command}' 2>/dev/null || echo '?')"
+    cur="$(tmux display-message -p -t "$window_id" '#{pane_current_command}' 2>/dev/null || echo '?')"
     if necro_is_idle_shell "$cur"; then
       resume_cmd="$(necro_agent_resume_cmd "$agent" "$uuid")"
-      [ -n "$resume_cmd" ] && { echo "  $resume_cmd"; run tmux send-keys -t "${window_id}.1" "$resume_cmd" Enter; }
+      [ -n "$resume_cmd" ] && { echo "  $resume_cmd"; run tmux send-keys -t "$window_id" "$resume_cmd" Enter; }
     else
       echo "  pane busy ($cur) — not resuming"
     fi

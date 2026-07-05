@@ -17,7 +17,7 @@ SNAP_DIR="$(necro_snapshot_dir)"
 # ── helpers ──────────────────────────────────────────────────────────────────
 
 list_snapshots() {
-  /bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null | grep -v 'enriched'
+  /bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null
 }
 
 list_all_snapshots() {
@@ -101,6 +101,7 @@ action_resume_backup() {
   printf 'Pick snapshot number: '
   read -r pick
   [ "$pick" = "0" ] || [ -z "$pick" ] && return
+  [[ "$pick" =~ ^[0-9]+$ ]] || { necro_warn "Invalid number."; return; }
   local idx=$(( pick - 1 ))
   local chosen="${snap_arr[$idx]:-}"
   [ -z "$chosen" ] && { necro_warn "Invalid choice."; return; }

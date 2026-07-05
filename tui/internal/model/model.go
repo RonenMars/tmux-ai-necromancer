@@ -433,10 +433,8 @@ func (m Model) updateExiting(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) finishExit(msg exitDoneMsg) Model {
-	defer func() {
-		m.selectedPane = nil
-		m.mode = modeTable
-	}()
+	m.selectedPane = nil
+	m.mode = modeTable
 
 	if msg.err != nil {
 		m.status = fmt.Sprintf("exit failed for %s: %v", msg.paneID, msg.err)
@@ -458,11 +456,11 @@ func (m Model) finishExit(msg exitDoneMsg) Model {
 	// Success.
 	m.captured[msg.paneID] = msg.uuid
 	if err := m.persistCapture(msg.paneID, msg.agent, msg.uuid); err != nil {
-		m.status = fmt.Sprintf("captured %s=%s but write failed: %v", msg.paneID, msg.uuid[:8], err)
+		m.status = fmt.Sprintf("captured %s=%s but write failed: %v", msg.paneID, shortUUID(msg.uuid), err)
 		return m
 	}
 	m.status = fmt.Sprintf("captured %s → %s%s",
-		msg.paneID, msg.uuid[:8], dryRunSuffix(m.dryRun))
+		msg.paneID, shortUUID(msg.uuid), dryRunSuffix(m.dryRun))
 	return m
 }
 
@@ -532,7 +530,7 @@ func (m *Model) rebuildRows() {
 	for _, p := range sorted {
 		uuid := ""
 		if rec, ok := m.bySnapshotID[p.PaneID]; ok && rec.UUID != "" {
-			uuid = rec.UUID[:8]
+			uuid = shortUUID(rec.UUID)
 		}
 		rows = append(rows, table.Row{
 			p.PaneID,
@@ -631,13 +629,22 @@ func lastNLines(s string, n int) string {
 }
 
 func truncate(s string, n int) string {
-	if len(s) <= n {
+	runes := []rune(s)
+	if len(runes) <= n {
 		return s
 	}
 	if n <= 1 {
-		return s[:n]
+		return string(runes[:n])
 	}
-	return s[:n-1] + "…"
+	return string(runes[:n-1]) + "…"
+}
+
+func shortUUID(uuid string) string {
+	runes := []rune(uuid)
+	if len(runes) <= 8 {
+		return uuid
+	}
+	return string(runes[:8])
 }
 
 func shortenHome(p string) string {

@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/snapshot"
 )
@@ -40,6 +41,35 @@ func TestLoadLatest_MissingDir(t *testing.T) {
 	}
 }
 
+func TestLoadLatest_PrefersNewestFileOverall(t *testing.T) {
+	dir := t.TempDir()
+	oldEnriched := filepath.Join(dir, "2026-01-01T00-00-00Z.enriched.jsonl")
+	newPlain := filepath.Join(dir, "2026-01-02T00-00-00Z.idle-only.jsonl")
+	if err := os.WriteFile(oldEnriched, []byte(`{"pane_id":"%1"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(newPlain, []byte(`{"pane_id":"%2"}`+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(oldEnriched, time.Unix(10, 0), time.Unix(10, 0)); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chtimes(newPlain, time.Unix(20, 0), time.Unix(20, 0)); err != nil {
+		t.Fatal(err)
+	}
+
+	recs, path, err := snapshot.LoadLatest(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if path != newPlain {
+		t.Fatalf("want newest plain path %q, got %q", newPlain, path)
+	}
+	if len(recs) != 1 || recs[0].PaneID != "%2" {
+		t.Fatalf("unexpected records: %+v", recs)
+	}
+}
+
 // ExtractResumeUUID covers the realistic shapes Claude prints on /exit.
 func TestExtractResumeUUID(t *testing.T) {
 	cases := []struct {
@@ -55,6 +85,11 @@ func TestExtractResumeUUID(t *testing.T) {
 		{
 			name: "no uuid at all",
 			in:   "see you later\n",
+			want: "",
+		},
+		{
+			name: "ignores uuid outside resume line",
+			in:   "request id 11111111-1111-1111-1111-111111111111\n",
 			want: "",
 		},
 		{

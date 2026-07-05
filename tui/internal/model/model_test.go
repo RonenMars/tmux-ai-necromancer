@@ -1,10 +1,12 @@
 package model
 
 import (
+	"errors"
 	"os"
 	"path/filepath"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/tmux"
 )
@@ -72,5 +74,34 @@ func TestUUIDForAgentPrefersCodexMetadataOverScrollbackUUID(t *testing.T) {
 	}
 	if got != want {
 		t.Fatalf("want %q, got %q", want, got)
+	}
+}
+
+func TestFinishExitReturnsToTableAfterError(t *testing.T) {
+	m := Model{
+		mode:         modeExiting,
+		selectedPane: &tmux.Pane{PaneID: "%1"},
+	}
+
+	got := m.finishExit(exitDoneMsg{paneID: "%1", err: errors.New("boom")})
+
+	if got.mode != modeTable {
+		t.Fatalf("want modeTable, got %v", got.mode)
+	}
+	if got.selectedPane != nil {
+		t.Fatalf("want selectedPane cleared, got %+v", got.selectedPane)
+	}
+}
+
+func TestShortUUIDAllowsShortValues(t *testing.T) {
+	if got := shortUUID("abc"); got != "abc" {
+		t.Fatalf("want short uuid unchanged, got %q", got)
+	}
+}
+
+func TestTruncatePreservesUTF8(t *testing.T) {
+	got := truncate("abc⚡def", 5)
+	if !utf8.ValidString(got) {
+		t.Fatalf("want valid UTF-8, got %q", got)
 	}
 }

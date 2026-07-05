@@ -58,8 +58,7 @@ func LoadFile(path string) ([]Record, error) {
 	return recs, sc.Err()
 }
 
-// LoadLatest finds the most recently modified *.jsonl in dir (skipping
-// .enriched.jsonl unless it's the only thing) and returns its records.
+// LoadLatest finds the most recently modified *.jsonl in dir and returns its records.
 // dir is typically ~/.claude/tmux-snapshots.
 func LoadLatest(dir string) ([]Record, string, error) {
 	entries, err := os.ReadDir(dir)
@@ -74,7 +73,7 @@ func LoadLatest(dir string) ([]Record, string, error) {
 		path string
 		mod  int64
 	}
-	var enriched, plain []cand
+	var candidates []cand
 	for _, e := range entries {
 		if e.IsDir() || !strings.HasSuffix(e.Name(), ".jsonl") {
 			continue
@@ -84,24 +83,15 @@ func LoadLatest(dir string) ([]Record, string, error) {
 			continue
 		}
 		c := cand{filepath.Join(dir, e.Name()), info.ModTime().Unix()}
-		if strings.HasSuffix(e.Name(), ".enriched.jsonl") {
-			enriched = append(enriched, c)
-		} else {
-			plain = append(plain, c)
-		}
+		candidates = append(candidates, c)
 	}
 
-	// Prefer enriched when available — it has first_user/last_assistant.
-	pick := enriched
-	if len(pick) == 0 {
-		pick = plain
-	}
-	if len(pick) == 0 {
+	if len(candidates) == 0 {
 		return nil, "", nil
 	}
-	sort.Slice(pick, func(i, j int) bool { return pick[i].mod > pick[j].mod })
-	recs, err := LoadFile(pick[0].path)
-	return recs, pick[0].path, err
+	sort.Slice(candidates, func(i, j int) bool { return candidates[i].mod > candidates[j].mod })
+	recs, err := LoadFile(candidates[0].path)
+	return recs, candidates[0].path, err
 }
 
 // IndexByPaneID builds a fast lookup keyed by pane_id (e.g. "%9").
@@ -127,11 +117,17 @@ var uuidRE = regexp.MustCompile(`[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}
 // most recently printed one — so old "to resume run claude --resume X"
 // lines from earlier sessions don't shadow the new one.
 func ExtractResumeUUID(scrollback string) string {
-	matches := uuidRE.FindAllString(scrollback, -1)
-	if len(matches) == 0 {
-		return ""
+	var last string
+	for _, line := range strings.Split(scrollback, "\n") {
+		if !strings.Contains(strings.ToLower(line), "resume") {
+			continue
+		}
+		matches := uuidRE.FindAllString(line, -1)
+		if len(matches) > 0 {
+			last = matches[len(matches)-1]
+		}
 	}
-	return matches[len(matches)-1]
+	return last
 }
 
 // AppendRecord appends one record to path as a single JSONL line.
