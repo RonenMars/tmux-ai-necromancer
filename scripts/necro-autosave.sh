@@ -71,11 +71,17 @@ trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
     echo "[$(necro_ts)] closed: pane=$pane_id agent=${cmd:-unknown} uuid=${uuid:-none} cwd=$cwd"
   done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_path}' 2>/dev/null)
 
-  # Rotate: keep only the N most-recent autosave files. POSIX loop (runs under
-  # /bin/sh via tmux — no `mapfile`).
+  # Rotate: keep only the N most-recent autosave files, but never the snapshot
+  # pinned as the reboot target — a delayed reboot-resume must still find it.
+  # POSIX loop (runs under /bin/sh via tmux — no `mapfile`).
+  pinned="$(readlink "$SNAP_DIR/latest-for-reboot" 2>/dev/null || true)"
   /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl "$SNAP_DIR"/*.enriched.jsonl 2>/dev/null \
     | tail -n "+$(( max_snapshots + 1 ))" \
     | while IFS= read -r f; do
+        if [ "$f" = "$pinned" ]; then
+          echo "[$(necro_ts)] rotation kept pinned reboot snapshot: $(basename "$f")"
+          continue
+        fi
         rm -f "$f"
         echo "[$(necro_ts)] rotated old snapshot: $(basename "$f")"
       done
