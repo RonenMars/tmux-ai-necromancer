@@ -116,6 +116,7 @@ set -g @necromancer_max_snapshots    '20'            # autosave files to keep
 set -g @necromancer_agents           'claude codex'  # which agents to track
 set -g @necromancer_restore_key      'R'             # prefix key for restore popup
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
+set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
 set -g @necromancer_status           'on'            # show status-right indicator
 set -g @necromancer_status_label     'necro'         # label for the indicator
@@ -124,6 +125,9 @@ set -g @necromancer_status_label     'necro'         # label for the indicator
 The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
 with prior Claude-only setups). Override with the option above or the
 `NECROMANCER_SNAPSHOT_DIR` env var.
+
+Each script writes to its own log file under `~/.tmux-ai-necromancer-logs`
+unless you override `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`.
 
 ## How it works
 

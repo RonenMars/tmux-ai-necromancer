@@ -92,6 +92,15 @@ they are reused — no duplicates, no extra agents launched.
 - The tmux status indicator is `necro:<tracked>/<active>`; disable it with
   `set -g @necromancer_status 'off'` if you do not want the extra segment.
 
+## Script logs
+
+- Script logs now write to `~/.tmux-ai-necromancer-logs` by default; override
+  `@necromancer_log_dir` or `NECROMANCER_LOG_DIR` if you want a different
+  location.
+- Each executable script gets its own log file, so `necro-autosave.sh` logs to
+  `necro-autosave.log`, `necro-restore.sh` logs to `necro-restore.log`, and so
+  on.
+
 ---
 
 ## `necro-restore.sh` exits with "duplicate session"

@@ -19,6 +19,7 @@ done
 SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 . "$SELF_DIR/../lib/common.sh"
 . "$SELF_DIR/../lib/agents.sh"
+necro_init_log "$0"
 necro_load_agents
 
 # Self-throttle: run at most once per second regardless of status-interval.

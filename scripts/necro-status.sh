@@ -15,6 +15,7 @@ done
 SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SELF_DIR/../lib/common.sh"
+necro_init_log "$0"
 # shellcheck source=../lib/agents.sh
 . "$SELF_DIR/../lib/agents.sh"
 necro_load_agents

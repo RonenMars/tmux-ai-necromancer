@@ -17,6 +17,7 @@ done
 SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SELF_DIR/../lib/common.sh"
+necro_init_log "$0"
 
 LAST_SAVE_OPTION="@necromancer_last_saved"
 SNAP_DIR="$(necro_snapshot_dir)"

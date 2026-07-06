@@ -10,10 +10,14 @@
 #   @necromancer_agents          space-separated agent list           (default "claude codex")
 #   @necromancer_snapshot_dir    where snapshots live  (default ~/.claude/tmux-snapshots)
 #   @necromancer_restore_key     prefix key to run restore            (default R)
+#   @necromancer_log_dir         where script logs live              (default ~/.tmux-ai-necromancer-logs)
 #   @necromancer_status          show status-right indicator          (default on)
 #   @necromancer_status_label    label for status-right indicator     (default necro)
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=lib/common.sh
+. "$CURRENT_DIR/lib/common.sh"
+necro_init_log "$0"
 
 set_default() {
   local opt="$1" def="$2"
@@ -27,6 +31,7 @@ set_default "@necromancer_max_snapshots"   "20"
 set_default "@necromancer_agents"          "claude codex"
 set_default "@necromancer_claude_commands" "claude"
 set_default "@necromancer_restore_key"     "R"
+set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_status"          "on"
 set_default "@necromancer_status_label"    "necro"
 

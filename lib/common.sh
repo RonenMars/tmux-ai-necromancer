@@ -4,6 +4,7 @@
 # Sourced, never executed. Provides:
 #   - PLUGIN_ROOT resolution (path-agnostic; works wherever the repo is cloned)
 #   - snapshot dir resolution (honors @necromancer_snapshot_dir / env / default)
+#   - log dir resolution (honors @necromancer_log_dir / env / default)
 #   - logging helpers
 #   - JSON string escaping
 #   - tmux option getters
@@ -57,6 +58,39 @@ necro_snapshot_dir() {
     return
   fi
   printf '%s' "$HOME/.claude/tmux-snapshots"
+}
+
+# --- Log dir ----------------------------------------------------------------
+# Precedence: explicit env var > tmux option > default local dir.
+necro_log_dir() {
+  if [ -n "${NECROMANCER_LOG_DIR:-}" ]; then
+    printf '%s' "$NECROMANCER_LOG_DIR"
+    return
+  fi
+  local opt
+  opt="$(necro_tmux_option @necromancer_log_dir "")"
+  if [ -n "$opt" ]; then
+    case "$opt" in
+      "~"|"~/"*) opt="$HOME${opt#\~}" ;;
+    esac
+    printf '%s' "$opt"
+    return
+  fi
+  printf '%s' "$HOME/.tmux-ai-necromancer-logs"
+}
+
+# Initialize per-script logging. Mirrors stdout/stderr to a log file in the
+# configured log dir while preserving interactive output.
+necro_init_log() {
+  local script="${1:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}}"
+  local name log_dir
+  name="$(basename "$script")"
+  name="${name%.*}"
+  log_dir="$(necro_log_dir)"
+  mkdir -p "$log_dir"
+  NECRO_LOG_FILE="$log_dir/$name.log"
+  export NECRO_LOG_FILE
+  exec > >(tee -a "$NECRO_LOG_FILE") 2>&1
 }
 
 # --- Logging ----------------------------------------------------------------

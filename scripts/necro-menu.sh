@@ -11,6 +11,7 @@ while [ -h "$_src" ]; do
 done
 SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 . "$SELF_DIR/../lib/common.sh"
+necro_init_log "$0"
 
 SNAP_DIR="$(necro_snapshot_dir)"
 
