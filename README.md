@@ -117,6 +117,8 @@ set -g @necromancer_agents           'claude codex'  # which agents to track
 set -g @necromancer_restore_key      'R'             # prefix key for restore popup
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
+set -g @necromancer_status           'on'            # show status-right indicator
+set -g @necromancer_status_label     'necro'         # label for the indicator
 ```
 
 The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
@@ -127,6 +129,10 @@ with prior Claude-only setups). Override with the option above or the
 
 Like tmux-continuum, the plugin appends `#(...)` hooks to `status-right`. tmux
 evaluates those on every status refresh.
+
+The visible status segment renders as `necro:<tracked>/<active>`, where
+`tracked` is panes with a pinned agent UUID and `active` is panes currently
+running a configured agent. If any tracked agents exited, it appends `+N`.
 
 **Pane watcher** (`necro-watch.sh`) runs every tick and maintains four tmux pane
 options: `@necro_uuid`, `@necro_agent`, `@necro_cmd`, and `@necro_agent_exited`.

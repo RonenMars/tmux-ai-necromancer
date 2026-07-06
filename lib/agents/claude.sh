@@ -27,6 +27,18 @@ agent_claude_project_dir() {
   printf '%s' "$HOME/.claude/projects/${cwd//\//-}"
 }
 
+agent_claude_transcript_path() {
+  local uuid="$1" cwd="$2"
+  printf '%s/%s.jsonl' "$(agent_claude_project_dir "$cwd")" "$uuid"
+}
+
+agent_claude_transcript_size() {
+  local uuid="$1" cwd="$2" path
+  path="$(agent_claude_transcript_path "$uuid" "$cwd")"
+  [ -f "$path" ] || return 0
+  wc -c < "$path" | tr -d ' '
+}
+
 # Most-recent session id (UUID) for a cwd via filesystem fallback ("" if none).
 agent_claude_latest_session_id() {
   local cwd="$1"
