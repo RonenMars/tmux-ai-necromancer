@@ -10,6 +10,8 @@
 #   @necromancer_agents          space-separated agent list           (default "claude codex")
 #   @necromancer_snapshot_dir    where snapshots live  (default ~/.claude/tmux-snapshots)
 #   @necromancer_restore_key     prefix key to run restore            (default R)
+#   @necromancer_status          show status-right indicator          (default on)
+#   @necromancer_status_label    label for status-right indicator     (default necro)
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
@@ -25,6 +27,8 @@ set_default "@necromancer_max_snapshots"   "20"
 set_default "@necromancer_agents"          "claude codex"
 set_default "@necromancer_claude_commands" "claude"
 set_default "@necromancer_restore_key"     "R"
+set_default "@necromancer_status"          "on"
+set_default "@necromancer_status_label"    "necro"
 
 AUTOSAVE="$CURRENT_DIR/scripts/necro-autosave.sh"
 
@@ -43,6 +47,14 @@ status_right="$(tmux show-option -gqv status-right 2>/dev/null)"
 case "$status_right" in
   *necro-watch.sh*) : ;;  # already wired
   *) tmux set-option -gq status-right "#($WATCHER)$status_right" ;;
+esac
+
+STATUS="$CURRENT_DIR/scripts/necro-status.sh"
+
+status_right="$(tmux show-option -gqv status-right 2>/dev/null)"
+case "$status_right" in
+  *necro-status.sh*) : ;;  # already wired
+  *) tmux set-option -gq status-right "#($STATUS)$status_right" ;;
 esac
 
 # Bind <prefix> <restore_key> to the restore script in a popup.

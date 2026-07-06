@@ -81,6 +81,17 @@ This is expected. Restore is keyed on a stable per-window marker
 (`@necro_id`). If the windows already exist from a previous restore run,
 they are reused — no duplicates, no extra agents launched.
 
+## New restore and status controls
+
+- Claude resumes are skipped when the transcript is too large; pass
+  `--force-large` or raise `@necromancer_max_claude_transcript_bytes` if that
+  is intentional.
+- Restore skips unsafe debug cwd paths such as `/private/tmp/claude-*`,
+  `*tmux-debug-build*`, and `*crashtest*`; pass `--allow-unsafe-cwd` only if
+  you know the snapshot is safe.
+- The tmux status indicator is `necro:<tracked>/<active>`; disable it with
+  `set -g @necromancer_status 'off'` if you do not want the extra segment.
+
 ---
 
 ## `necro-restore.sh` exits with "duplicate session"
