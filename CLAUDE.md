@@ -21,6 +21,7 @@ scripts/                   the executables (all source lib/*.sh)
   necro-context.sh         enrich a snapshot with conversation previews
   necro-reboot-prep.sh     pre-reboot: snapshot + enrich + resurrect save + pin pointer
   necro-reboot-resume.sh   post-reboot: ensure server up → necro-restore.sh
+  necro-prune.sh           kill windows whose panes are all idle shells (no child procs)
 lib/
   common.sh                PLUGIN_ROOT resolution, snapshot dir, logging, json escape
   agents.sh                adapter registry + dispatch
@@ -79,6 +80,14 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    `mkdir` is the only POSIX-safe atomic primitive here; `trap ... EXIT` cleans
    up on any exit path.
 
+8. **Prune keys on child processes, not agent match, and operates per-window.**
+   `necro-prune.sh` kills a window only when *every* pane's process has no child
+   (`pgrep -P`) — so agents, editors, and builds all survive. Killing at the
+   window (not pane) level stops tmux from respawning a fresh shell per dead
+   pane. It is manual-only and destructive — never wire it into autosave/reboot.
+   Track the busy set as a space-delimited string, not a bash-4 assoc array
+   (same `/bin/sh` constraint as autosave rotation).
+
 ## Testing
 
 Self-contained bash tests live in `tests/`. Each uses `mktemp -d` + `NECROMANCER_SNAPSHOT_DIR`
@@ -87,6 +96,7 @@ for full isolation — no live tmux server required. Run any test directly:
 ```bash
 bash tests/necro-autosave-lock-test.sh   # lock: only one concurrent autosave fires
 bash tests/necro-context-codex-test.sh   # context enrichment for Codex sessions
+bash tests/necro-prune-idle-window-test.sh  # prune kills idle windows, keeps busy ones
 ```
 
 For restore/snapshot changes, run against an **isolated tmux socket**:
