@@ -82,6 +82,10 @@ Scripts live in `scripts/` inside the plugin dir
 (`~/.tmux/plugins/tmux-ai-necromancer/scripts/`). Add it to `PATH` or alias the
 ones you use.
 
+`necro-restore.sh` restores a snapshot you choose explicitly. `necro-reboot-resume.sh`
+is the reboot wrapper behind `necro-resume`; it finds the pinned reboot snapshot,
+ensures tmux is up, then calls restore for you.
+
 ### Recommended shell aliases
 
 Add these to your shell config (`~/.zshrc`, `~/.bashrc`, `config.fish`, etc.):

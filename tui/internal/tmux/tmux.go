@@ -13,7 +13,10 @@ import (
 // when no server is up.
 func isNoServer(err error) bool {
 	if ee, ok := err.(*exec.ExitError); ok {
-		return strings.Contains(string(ee.Stderr), "no server running")
+		stderr := string(ee.Stderr)
+		return strings.Contains(stderr, "no server running") ||
+			(strings.Contains(stderr, "error connecting to ") &&
+				strings.Contains(stderr, "No such file or directory"))
 	}
 	return false
 }

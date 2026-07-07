@@ -197,6 +197,18 @@ window_id_for_mark() {
     | awk -F'\t' -v m="$mark" '$1==m {print $2; exit}'
 }
 
+unmarked_window_id_for_record() {
+  local session="$1" win_idx="$2" win_name="$3" safe_name="$4" cwd="$5"
+  tmux list-windows -t "=$session" -F "#{window_index}	#{window_name}	#{window_id}	#{pane_current_path}	#{$NECRO_MARK}" 2>/dev/null \
+    | awk -F'\t' -v idx="$win_idx" -v name="$win_name" -v safe="$safe_name" -v cwd="$cwd" \
+        '$5 == "" && $4 == cwd && ($1 == idx || $2 == name || $2 == safe) { print $3; exit }'
+}
+
+window_current_command() {
+  local target="$1"
+  tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null || true
+}
+
 ensure_session() {
   local session="$1" cwd="$2" name="$3"
   if tmux has-session -t "=$session" 2>/dev/null; then
@@ -229,6 +241,7 @@ while IFS= read -r line; do
 
   session=$(jq -r '.session // empty' <<<"$line")
   pane_id=$(jq -r '.pane_id // empty' <<<"$line")
+  win_idx=$(jq -r '.window_index // empty' <<<"$line")
   win_name=$(jq -r '.window_name // empty' <<<"$line")
   cwd=$(jq -r '.cwd // empty' <<<"$line")
   agent=$(jq -r '.agent // empty' <<<"$line")
@@ -258,10 +271,28 @@ while IFS= read -r line; do
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
 
-  # Idempotency: if a window already carries this marker, reuse it. Otherwise
-  # add one. On a freshly-created session, claim its initial window for the
-  # first record instead of adding a second.
-  if window_marked "$session" "$mark"; then
+  # Idempotency: claim matching unmarked windows first (tmux-resurrect creates
+  # layout-only shells with no @necro_id), then fall back to existing markers.
+  # On a freshly-created session, claim its initial window for this record
+  # instead of adding a second.
+  claim_id=""
+  if [ "$session_fresh" = "0" ]; then
+    claim_id="$(unmarked_window_id_for_record "$session" "$win_idx" "$win_name" "$safe_name" "$cwd")"
+  fi
+
+  if [ -n "$claim_id" ]; then
+    echo "  existing window matches snapshot — claiming marker"
+    window_id="$claim_id"
+    [ "$DRY_RUN" = "1" ] || tmux set-option -w -t "$window_id" "$NECRO_MARK" "$mark" 2>/dev/null || true
+    reused=$((reused + 1))
+    cur_cmd="$(window_current_command "$window_id")"
+    if necro_is_idle_shell "$cur_cmd"; then
+      fresh=1
+    else
+      echo "  claimed window is busy ($cur_cmd) — not resuming"
+      fresh=0
+    fi
+  elif window_marked "$session" "$mark"; then
     echo "  already restored (marker) — reusing"
     reused=$((reused + 1))
     fresh=0

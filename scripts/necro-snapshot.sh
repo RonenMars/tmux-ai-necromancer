@@ -89,9 +89,8 @@ wait_for_shell() {
   printf '%s' "$cmd"; return 1
 }
 
-# Resolve a session id for an idle/skipped/idle-only pane.
+# Resolve a session id for a live/skipped pane.
 # For live agents uses pop (advances cursor so duplicate cwds get different UUIDs).
-# For idle shells falls back to latest (no cursor needed — agent is gone).
 resolve_fallback_id() {
   local agent="$1" cwd="$2" live="${3:-0}"
   if [ "$live" = "1" ]; then
@@ -123,22 +122,14 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
 
   agent="$(necro_agent_for_cmd "$cmd")"
 
-  # Idle shell — agent may have just exited; try pane option first, then fallback for every agent.
+  # Idle shell — only trust pane-local watcher state. A cwd-only latest-jsonl
+  # lookup can attach the same stale UUID to every shell in that directory.
   if necro_is_idle_shell "$cmd"; then
-    # Watcher may have pinned a UUID before the agent exited.
     found_uuid="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
     found_agent="$(tmux show-option -pqv -t "$pane_id" @necro_agent 2>/dev/null || true)"
-    found_source="pane-option"
-    if [ -z "$found_uuid" ]; then
-      found_uuid=""; found_agent=""
-      for a in $(necro_enabled_agents); do
-        fb="$(resolve_fallback_id "$a" "$cwd")"
-        if [ -n "$fb" ]; then found_uuid="$fb"; found_agent="$a"; found_source="latest-jsonl"; break; fi
-      done
-    fi
-    if [ -n "$found_uuid" ]; then
-      echo "  idle shell — ${found_source} id ($found_agent): $found_uuid"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$found_agent" "$found_uuid" "$found_source"
+    if [ -n "$found_uuid" ] && [ -n "$found_agent" ]; then
+      echo "  idle shell — pane-option id ($found_agent): $found_uuid"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$found_agent" "$found_uuid" "pane-option"
     else
       echo "  idle shell — no session found, recording without id"
       emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "" "" ""

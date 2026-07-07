@@ -80,8 +80,6 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
       tmux set-option -p -t "$pane_id" @necro_uuid "$farewell" 2>/dev/null || true
     fi
     tmux set-option -p  -t "$pane_id" @necro_agent_exited "1" 2>/dev/null || true
-    tmux set-option -pu -t "$pane_id" @necro_cmd               2>/dev/null || true
-    tmux set-option -pu -t "$pane_id" @necro_agent             2>/dev/null || true
     continue
   fi
 

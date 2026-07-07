@@ -55,6 +55,10 @@ or Tabby window not attached to a session), then run `necro-resume` there.
 `necro-menu` does **not** have this restriction — it calls `necro-restore.sh`
 directly (no `$TMUX` guard), so you can run it from inside or outside tmux.
 
+Use `necro-restore.sh <snapshot>` when you already know which snapshot file to
+restore. Use `necro-resume` when you want the post-reboot wrapper to pick the
+pinned reboot snapshot and bring tmux back up first.
+
 ---
 
 ## Autosave shows only 3 records when many sessions are open
