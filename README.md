@@ -75,6 +75,7 @@ run-shell ~/.tmux/plugins/tmux-ai-necromancer/tmux-ai-necromancer.tmux  # in tmu
 | Dry-run a restore | `necro-restore.sh --dry-run` |
 | Before reboot | `necro-reboot-prep.sh` (or `safe-reboot` / `safe-shutdown` aliases) |
 | After reboot | `necro-reboot-resume.sh` |
+| Prune idle-shell windows | `necro-prune.sh` (`--dry-run` to preview) |
 | Interactive menu | `necro-menu.sh` |
 | Session viewer | `make -C tui run` |
 
@@ -96,6 +97,9 @@ alias necro-resume='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-reboot-res
 
 # interactive menu: browse/restore/cleanup snapshots, prep for reboot
 alias necro-menu='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-menu.sh'
+
+# prune tmux windows where every pane is an idle shell (keeps agents/editors/builds)
+alias necro-prune='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-prune.sh'
 
 # safe reboot/shutdown: snapshot all live sessions FIRST, then hand off to the OS.
 # Use these instead of the Apple menu / system shutdown — see docs/TROUBLESHOOTING.md.
