@@ -46,13 +46,28 @@ agent_claude_latest_session_id() {
 }
 
 # All session ids for a cwd, newest-first, one per line.
+# Excludes teammate/subagent transcripts (first line is a <teammate-message>
+# from the Agent/SendMessage subagent harness) — those are never a pane's
+# primary interactive session and must not be handed out by the cursor pop.
+#
+# Optional 2nd arg: min_epoch. When given, a transcript is only a candidate
+# if its mtime is >= min_epoch — a transcript last touched before the pane
+# existed can't be that pane's session. This is a proxy filter, not proof
+# (mtime is "last write", not "created"), but it's enough to reject sessions
+# that are days/weeks stale relative to the pane, which is the failure mode
+# this guards against.
 agent_claude_all_session_ids() {
-  local cwd="$1" proj_dir
+  local cwd="$1" min_epoch="${2:-}" proj_dir f mtime
   proj_dir="$(agent_claude_project_dir "$cwd")"
   [ -d "$proj_dir" ] || return 0
-  /bin/ls -t "$proj_dir"/*.jsonl 2>/dev/null \
-    | xargs -n1 basename 2>/dev/null \
-    | sed -nE "s/^($CLAUDE_UUID_RE)\.jsonl\$/\\1/p"
+  for f in $(/bin/ls -t "$proj_dir"/*.jsonl 2>/dev/null); do
+    if [ -n "$min_epoch" ]; then
+      mtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)"
+      [ -n "$mtime" ] && [ "$mtime" -lt "$min_epoch" ] && continue
+    fi
+    head -c 400 "$f" 2>/dev/null | grep -q '<teammate-message' && continue
+    basename "$f" | sed -nE "s/^($CLAUDE_UUID_RE)\.jsonl\$/\\1/p"
+  done
 }
 
 # Scrape a session id from pane scrollback near a "resume" marker ("" if none).
@@ -72,6 +87,21 @@ agent_claude_scrape_resume_cmd() {
   tmux capture-pane -p -t "$pane" -S -50 2>/dev/null \
     | grep -oE -- "--resume $CLAUDE_UUID_RE" \
     | tail -1 \
+    | grep -oE "$CLAUDE_UUID_RE" \
+    | head -1
+}
+
+# Ground-truth UUID from the actual running process argv (not a guess).
+# Reads `ps` for the pane's foreground child and extracts `--resume <uuid>`
+# if present. Returns "" for a fresh (non-resumed) session — that's not a
+# failure, it just means this pane has no prior session id to report yet.
+agent_claude_scrape_ps_resume() {
+  local pane="$1" pane_pid child
+  pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"
+  [ -n "$pane_pid" ] || return 0
+  for child in $(pgrep -P "$pane_pid" 2>/dev/null); do
+    ps -o command= -p "$child" 2>/dev/null
+  done | grep -oE -- "--resume $CLAUDE_UUID_RE" \
     | grep -oE "$CLAUDE_UUID_RE" \
     | head -1
 }

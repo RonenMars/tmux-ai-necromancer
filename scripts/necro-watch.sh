@@ -9,6 +9,13 @@
 #   @necro_cmd          — the command name that matched (e.g. "claude", "cc")
 #   @necro_agent        — the adapter name that matched (e.g. "claude")
 #   @necro_agent_exited — "1" when the agent has exited cleanly
+#   @necro_pane_first_seen — epoch seconds when this pane's agent was first
+#                            observed. tmux has no true pane/window creation
+#                            timestamp, so this is the closest proxy: used to
+#                            reject cursor-pop candidates that predate the
+#                            pane (a stale/unrelated transcript can't belong
+#                            to a pane that didn't exist yet when it was
+#                            written).
 set -uo pipefail
 
 _src="${BASH_SOURCE[0]}"
@@ -46,21 +53,38 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
 
   # ── Case 1: agent restarted in a pane that previously exited ──────────────
   if [ -n "$agent" ] && [ "$exited" = "1" ]; then
-    tmux set-option -pu -t "$pane_id" @necro_uuid          2>/dev/null || true
-    tmux set-option -pu -t "$pane_id" @necro_cmd           2>/dev/null || true
-    tmux set-option -pu -t "$pane_id" @necro_agent         2>/dev/null || true
-    tmux set-option -pu -t "$pane_id" @necro_agent_exited  2>/dev/null || true
+    tmux set-option -pu -t "$pane_id" @necro_uuid            2>/dev/null || true
+    tmux set-option -pu -t "$pane_id" @necro_cmd             2>/dev/null || true
+    tmux set-option -pu -t "$pane_id" @necro_agent           2>/dev/null || true
+    tmux set-option -pu -t "$pane_id" @necro_agent_exited    2>/dev/null || true
+    tmux set-option -pu -t "$pane_id" @necro_pane_first_seen 2>/dev/null || true
     pinned_uuid=""; pinned_cmd=""; pinned_agent=""; exited=""
     # Falls through to Case 2 (pin fresh UUID).
   fi
 
   # ── Case 2: new agent pane detected, not yet pinned ───────────────────────
   if [ -n "$agent" ] && [ -z "$pinned_uuid" ]; then
-    # Try scrollback first (resurrect edge case: pane started with --resume).
-    uuid="$(necro_agent_scrape_resume_cmd "$agent" "$pane_id" 2>/dev/null || true)"
-    # Fall back to cursor pop.
+    # Ground truth first: read --resume <uuid> straight from the running
+    # process argv. Scrollback and cursor-pop are both guesses; argv isn't.
+    uuid="$(necro_agent_scrape_ps_resume "$agent" "$pane_id" 2>/dev/null || true)"
+    # Fall back to scrollback (resurrect edge case: pane started with --resume
+    # but the process already exited/respawned before this tick).
     if [ -z "$uuid" ]; then
-      uuid="$(necro_agent_pop_session_id "$agent" "$cwd" 2>/dev/null || true)"
+      uuid="$(necro_agent_scrape_resume_cmd "$agent" "$pane_id" 2>/dev/null || true)"
+    fi
+    # First-seen stamp: closest proxy tmux offers for pane creation time.
+    # Written before the cursor-pop fallback so that fallback can reject
+    # transcripts older than this pane.
+    first_seen="$(tmux show-option -pqv -t "$pane_id" @necro_pane_first_seen 2>/dev/null || true)"
+    if [ -z "$first_seen" ]; then
+      first_seen="$now"
+      tmux set-option -p -t "$pane_id" @necro_pane_first_seen "$first_seen" 2>/dev/null || true
+    fi
+    # Last resort: cursor pop. Only reached for fresh (non-resumed) sessions
+    # where no ground truth exists yet. Filtered to transcripts no older than
+    # this pane, so a stale/unrelated session can't be handed out.
+    if [ -z "$uuid" ]; then
+      uuid="$(necro_agent_pop_session_id "$agent" "$cwd" "$first_seen" 2>/dev/null || true)"
     fi
     if [ -n "$uuid" ]; then
       tmux set-option -p -t "$pane_id" @necro_uuid  "$uuid"  2>/dev/null || true
