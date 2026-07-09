@@ -45,9 +45,13 @@ necro_agent_for_cmd() {
 # File-based cursor so the index survives subshell boundaries (command substitution
 # forks a subshell; writes to an in-memory array would be lost on return).
 # Cursor files live in $NECRO_CURSOR_DIR (set by the snapshot script before sourcing).
-# Usage: necro_agent_pop_session_id "$agent" "$cwd" — prints next unused UUID.
+# Usage: necro_agent_pop_session_id "$agent" "$cwd" ["$min_epoch"] — prints
+# next unused UUID. When min_epoch is given, candidates are pre-filtered to
+# transcripts created at or after that time (see agent_<name>_all_session_ids)
+# so a stale/unrelated session from days ago can't be handed to a pane that
+# didn't exist yet when it was written.
 necro_agent_pop_session_id() {
-  local agent="$1" cwd="$2"
+  local agent="$1" cwd="$2" min_epoch="${3:-}"
   declare -f "agent_${agent}_all_session_ids" >/dev/null 2>&1 || return 0
   # Cursor dir must be set by the caller (snapshot script sets NECRO_CURSOR_DIR).
   local cursor_dir="${NECRO_CURSOR_DIR:-}"
@@ -60,7 +64,7 @@ necro_agent_pop_session_id() {
   local ids=()
   while IFS= read -r id; do
     [ -n "$id" ] && ids+=("$id")
-  done < <("agent_${agent}_all_session_ids" "$cwd" 2>/dev/null)
+  done < <("agent_${agent}_all_session_ids" "$cwd" "$min_epoch" 2>/dev/null)
   if [ "${#ids[@]}" -eq 0 ] || [ "$idx" -ge "${#ids[@]}" ]; then
     return 0  # exhausted
   fi
@@ -88,6 +92,12 @@ necro_agent_scrape_resume_cmd() {
   local agent="$1"; shift
   declare -f "agent_${agent}_scrape_resume_cmd" >/dev/null 2>&1 || return 0
   "agent_${agent}_scrape_resume_cmd" "$@"
+}
+
+necro_agent_scrape_ps_resume() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_scrape_ps_resume" >/dev/null 2>&1 || return 0
+  "agent_${agent}_scrape_ps_resume" "$@"
 }
 
 necro_agent_resume_cmd() {

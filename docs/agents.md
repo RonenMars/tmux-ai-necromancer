@@ -26,6 +26,13 @@ agent_<name>_scrape_session_id() { ... }
 # Return "" if N/A.
 agent_<name>_scrape_resume_cmd() { ... }
 
+# Optional: read the session id straight from the pane's foreground process
+# argv (e.g. `ps` on the pane's child PID) instead of guessing from
+# scrollback or a filesystem cursor. This is ground truth when available —
+# the watcher tries it first. Return "" if N/A (e.g. a fresh, non-resumed
+# session has no id here yet — that's not a failure).
+agent_<name>_scrape_ps_resume() { ... }
+
 # The shell command that resumes a session id.
 agent_<name>_resume_cmd() { printf '<binary> resume %s' "$1"; }
 
@@ -35,13 +42,36 @@ agent_<name>_exit_keys() { printf '/exit'; }
 
 ## How session ids are recovered
 
-Two strategies, in priority order:
+Three strategies, in priority order:
 
-1. **Scrollback scrape** — high confidence, but only works when the agent was
+1. **Process argv (`scrape_ps_resume`)** — ground truth: reads the id the
+   pane's agent process was actually launched with. Preferred whenever
+   available; nothing to guess. Returns "" for a fresh session that was never
+   resumed — there's no id to report yet, not a failure.
+2. **Scrollback scrape** — high confidence, but only works when the agent was
    cleanly exited interactively and printed a resume hint that's still on
-   screen. Most agents won't have this; returning "" is fine.
-2. **Filesystem fallback** — the reliable path for autosave. Map a working
-   directory to the agent's most-recent transcript and extract its id.
+   screen, or the pane's scrollback still holds the startup `--resume` line.
+   Most agents won't have this; returning "" is fine.
+3. **Filesystem fallback** — last resort, used only when neither of the above
+   yields an id (typically a genuinely fresh session). Maps a working
+   directory to the agent's most-recent transcript. Because it can't verify
+   which pane a transcript actually belongs to, treat it as a guess: filter
+   out anything that clearly isn't a standalone interactive session (e.g.
+   `claude.sh` excludes teammate/subagent transcripts from this list), and
+   honor an optional `min_epoch` filter (see below) so a stale transcript
+   can't be handed to a pane that didn't exist yet when it was last touched.
+
+### `min_epoch` filtering on the filesystem fallback
+
+`agent_<name>_all_session_ids "$cwd" ["$min_epoch"]` takes an optional second
+argument: an epoch-seconds floor. When present, only transcripts touched at or
+after that time are candidates. The watcher passes the pane's
+`@necro_pane_first_seen` stamp (the closest proxy tmux offers for "when this
+pane was created" — tmux has no true creation timestamp) so a transcript from
+days/weeks before the pane existed is never eligible, no matter where it falls
+in the newest-mtime-first ordering. Adapters that don't implement this
+filtering (e.g. `codex.sh`) simply ignore the extra argument — it's optional,
+not part of the required contract.
 
 The two reference adapters show both shapes:
 
