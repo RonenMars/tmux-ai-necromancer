@@ -34,12 +34,16 @@ SNAPSHOT=""
 DRY_RUN=0
 FORCE_LARGE=0
 ALLOW_UNSAFE_CWD=0
+RESUME_DELAY_OPT=""
+RESUME_BATCH_SIZE_OPT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --force-large) FORCE_LARGE=1; shift ;;
     --allow-unsafe-cwd) ALLOW_UNSAFE_CWD=1; shift ;;
+    --resume-delay) RESUME_DELAY_OPT="${2:-}"; shift 2 ;;
+    --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
     -h|--help)
       cat <<'H'
 necro-restore.sh — recreate AI-agent tmux sessions from a snapshot.
@@ -50,6 +54,8 @@ Usage:
   necro-restore.sh --dry-run        print the plan, change nothing
   necro-restore.sh --force-large    resume Claude transcripts over the size limit
   necro-restore.sh --allow-unsafe-cwd
+  necro-restore.sh --resume-delay N        seconds between resume batches (default 5)
+  necro-restore.sh --resume-batch-size N   resumes per batch before pausing (default 1)
 
 Config:
   NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES or @necromancer_max_claude_transcript_bytes
@@ -57,6 +63,15 @@ Config:
   NECROMANCER_UNSAFE_CWD_PATTERNS or @necromancer_unsafe_cwd_patterns
       Space-separated shell globs. Defaults to:
       /private/tmp/claude-* *tmux-debug-build* *crashtest*
+  NECROMANCER_RESUME_DELAY or @necromancer_resume_delay
+      Seconds to pause after each resume batch (default 5). Restoring many
+      sessions at once spikes CPU/memory enough to stall the machine —
+      raise this if you still see that on a large restore. --resume-delay
+      overrides both.
+  NECROMANCER_RESUME_BATCH_SIZE or @necromancer_resume_batch_size
+      How many resumes to launch before pausing for the delay (default 1 —
+      pause after every single resume). Raise this to let a few launches
+      fire back-to-back between pauses. --resume-batch-size overrides both.
 
 Idempotent: reuses existing sessions/windows; resumes only into fresh panes.
 H
@@ -104,6 +119,36 @@ max_claude_transcript_bytes() {
   fi
   case "$val" in
     ''|*[!0-9]*) printf '52428800' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+resume_delay_seconds() {
+  local val
+  if [ -n "$RESUME_DELAY_OPT" ]; then
+    val="$RESUME_DELAY_OPT"
+  elif [ -n "${NECROMANCER_RESUME_DELAY:-}" ]; then
+    val="$NECROMANCER_RESUME_DELAY"
+  else
+    val="$(necro_tmux_option @necromancer_resume_delay "5")"
+  fi
+  case "$val" in
+    ''|*[!0-9.]*) printf '5' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+resume_batch_size() {
+  local val
+  if [ -n "$RESUME_BATCH_SIZE_OPT" ]; then
+    val="$RESUME_BATCH_SIZE_OPT"
+  elif [ -n "${NECROMANCER_RESUME_BATCH_SIZE:-}" ]; then
+    val="$NECROMANCER_RESUME_BATCH_SIZE"
+  else
+    val="$(necro_tmux_option @necromancer_resume_batch_size "1")"
+  fi
+  case "$val" in
+    ''|*[!0-9]*|0) printf '1' ;;
     *) printf '%s' "$val" ;;
   esac
 }
@@ -162,6 +207,9 @@ stage 2 5 "reading snapshot"
 total_records="$(grep -cve '^[[:space:]]*$' "$SNAPSHOT" 2>/dev/null || true)"
 total_records="${total_records:-0}"
 max_claude_bytes="$(max_claude_transcript_bytes)"
+resume_delay="$(resume_delay_seconds)"
+resume_batch="$(resume_batch_size)"
+resume_batch_count=0
 
 necro_hr
 necro_say "Necromancer restore"
@@ -169,6 +217,7 @@ echo "  Snapshot: $SNAPSHOT"
 echo "  Records:  $total_records"
 echo "  Dry-run:  $DRY_RUN"
 echo "  Max Claude transcript: $(format_bytes "$max_claude_bytes") ($max_claude_bytes bytes)"
+echo "  Resume pacing: ${resume_delay}s pause every ${resume_batch} resume(s)"
 echo "  Force large Claude transcripts: $FORCE_LARGE"
 echo "  Allow unsafe cwd paths: $ALLOW_UNSAFE_CWD"
 echo "  Unsafe cwd patterns: $(unsafe_cwd_patterns || true)"
@@ -335,6 +384,14 @@ while IFS= read -r line; do
       echo "  resume: $resume_cmd"
       run tmux send-keys -t "$target" "$resume_cmd" Enter
       resumed=$((resumed + 1))
+      resume_batch_count=$((resume_batch_count + 1))
+      # Pace launches in batches — each resume reads a transcript + hits the
+      # API for initial context; firing them all back-to-back spikes
+      # CPU/memory enough to stall the machine on a multi-session restore.
+      # Pause only every Nth resume (resume_batch), not after every single one.
+      if [ "$DRY_RUN" = "0" ] && [ "$((resume_batch_count % resume_batch))" -eq 0 ]; then
+        sleep "$resume_delay"
+      fi
     else
       echo "  skip resume: no resume command for agent '$agent'"
       resume_skipped=$((resume_skipped + 1))

@@ -128,7 +128,19 @@ set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
 set -g @necromancer_status           'on'            # show status-right indicator
 set -g @necromancer_status_label     'necro'         # label for the indicator
+set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
+set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 ```
+
+`@necromancer_resume_delay` / `@necromancer_resume_batch_size` govern
+`necro-restore.sh` and `necro-apply.sh`: launching several `claude --resume`
+processes back-to-back (each reads a transcript and hits the API for initial
+context) can spike CPU/memory enough to stall the machine on a large restore.
+By default one resume launches, then the script pauses 5s before the next.
+Raise `@necromancer_resume_batch_size` to let a few resumes fire together
+before each pause, or override per-invocation with `--resume-delay N` /
+`--resume-batch-size N` (or `NECROMANCER_RESUME_DELAY` /
+`NECROMANCER_RESUME_BATCH_SIZE`).
 
 The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
 with prior Claude-only setups). Override with the option above or the

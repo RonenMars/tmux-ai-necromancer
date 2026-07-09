@@ -7,7 +7,7 @@
 # Use this to reorganize a sprawling server; use necro-restore.sh to rebuild a
 # fresh/empty one.
 #
-# Usage: necro-apply.sh <snapshot.jsonl> [--dry-run]
+# Usage: necro-apply.sh <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]
 set -uo pipefail
 
 _src="${BASH_SOURCE[0]}"
@@ -23,8 +23,18 @@ necro_init_log "$0"
 . "$SELF_DIR/../lib/agents.sh"
 necro_load_agents
 
-[ $# -ge 1 ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run]"; exit 2; }
-IN="$1"; DRY_RUN=0; [ "${2:-}" = "--dry-run" ] && DRY_RUN=1
+[ $# -ge 1 ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]"; exit 2; }
+IN=""; DRY_RUN=0; RESUME_DELAY_OPT=""; RESUME_BATCH_SIZE_OPT=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --dry-run) DRY_RUN=1; shift ;;
+    --resume-delay) RESUME_DELAY_OPT="${2:-}"; shift 2 ;;
+    --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
+    -*) necro_err "Unknown flag: $1"; exit 2 ;;
+    *)  IN="$1"; shift ;;
+  esac
+done
+[ -n "$IN" ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]"; exit 2; }
 [ -f "$IN" ] || { necro_err "Not found: $IN"; exit 1; }
 command -v jq >/dev/null || { necro_err "jq not installed."; exit 1; }
 
@@ -37,6 +47,43 @@ EOF
 )"
 
 run() { if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
+
+# Pacing between resume launches. Firing every `claude --resume` back-to-back
+# spikes CPU/memory (transcript read + initial API call) enough to stall the
+# machine on a multi-pane apply. Same knobs as necro-restore.sh.
+resume_delay_seconds() {
+  local val
+  if [ -n "$RESUME_DELAY_OPT" ]; then
+    val="$RESUME_DELAY_OPT"
+  elif [ -n "${NECROMANCER_RESUME_DELAY:-}" ]; then
+    val="$NECROMANCER_RESUME_DELAY"
+  else
+    val="$(necro_tmux_option @necromancer_resume_delay "5")"
+  fi
+  case "$val" in
+    ''|*[!0-9.]*) printf '5' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+resume_batch_size() {
+  local val
+  if [ -n "$RESUME_BATCH_SIZE_OPT" ]; then
+    val="$RESUME_BATCH_SIZE_OPT"
+  elif [ -n "${NECROMANCER_RESUME_BATCH_SIZE:-}" ]; then
+    val="$NECROMANCER_RESUME_BATCH_SIZE"
+  else
+    val="$(necro_tmux_option @necromancer_resume_batch_size "1")"
+  fi
+  case "$val" in
+    ''|*[!0-9]*|0) printf '1' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+RESUME_DELAY="$(resume_delay_seconds)"
+RESUME_BATCH="$(resume_batch_size)"
+RESUME_BATCH_COUNT=0
 
 match_route() {
   local cwd="$1" glob session root
@@ -84,7 +131,14 @@ while IFS= read -r line; do
     cur="$(tmux display-message -p -t "$window_id" '#{pane_current_command}' 2>/dev/null || echo '?')"
     if necro_is_idle_shell "$cur"; then
       resume_cmd="$(necro_agent_resume_cmd "$agent" "$uuid")"
-      [ -n "$resume_cmd" ] && { echo "  $resume_cmd"; run tmux send-keys -t "$window_id" "$resume_cmd" Enter; }
+      if [ -n "$resume_cmd" ]; then
+        echo "  $resume_cmd"
+        run tmux send-keys -t "$window_id" "$resume_cmd" Enter
+        RESUME_BATCH_COUNT=$((RESUME_BATCH_COUNT + 1))
+        if [ "$DRY_RUN" = "0" ] && [ "$((RESUME_BATCH_COUNT % RESUME_BATCH))" -eq 0 ]; then
+          sleep "$RESUME_DELAY"
+        fi
+      fi
     else
       echo "  pane busy ($cur) — not resuming"
     fi

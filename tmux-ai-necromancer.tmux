@@ -13,6 +13,8 @@
 #   @necromancer_log_dir         where script logs live              (default ~/.tmux-ai-necromancer-logs)
 #   @necromancer_status          show status-right indicator          (default on)
 #   @necromancer_status_label    label for status-right indicator     (default necro)
+#   @necromancer_resume_delay      seconds to pause between resume batches (default 5)
+#   @necromancer_resume_batch_size resumes launched per batch before pausing (default 1)
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh
@@ -34,6 +36,8 @@ set_default "@necromancer_restore_key"     "R"
 set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_status"          "on"
 set_default "@necromancer_status_label"    "necro"
+set_default "@necromancer_resume_delay"       "5"
+set_default "@necromancer_resume_batch_size"  "1"
 
 AUTOSAVE="$CURRENT_DIR/scripts/necro-autosave.sh"
 
