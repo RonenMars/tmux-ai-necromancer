@@ -88,6 +88,32 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    Track the busy set as a space-delimited string, not a bash-4 assoc array
    (same `/bin/sh` constraint as autosave rotation).
 
+9. **Pane UUID pinning tries process argv before scrollback before cursor-pop
+   — in that order, always.** The watcher (`necro-watch.sh`) resolves which
+   Claude/Codex session a pane belongs to via
+   `agent_<name>_scrape_ps_resume` (reads `--resume <uuid>` straight from the
+   pane's running process argv — ground truth) first, scrollback scrape
+   second, and the filesystem cursor-pop fallback last. The cursor-pop
+   fallback previously ran with no verification and silently pinned
+   stale/unrelated transcripts (days or weeks old) and even subagent/teammate
+   transcripts to live panes. It's still needed for genuinely fresh sessions
+   with no `--resume` in argv yet, but it must (a) exclude teammate/subagent
+   transcripts (`agent_claude_all_session_ids` skips any `.jsonl` starting
+   with `<teammate-message`) and (b) reject transcripts older than the pane's
+   `@necro_pane_first_seen` stamp via the optional `min_epoch` filter. Never
+   drop back to a scrollback/cursor-pop-only resolution order.
+
+10. **Resume launches during restore/apply must be paced, not fired all at
+    once.** `necro-restore.sh` and `necro-apply.sh` send a `claude`/`codex
+    --resume` into every matching pane; doing this back-to-back for several
+    sessions spikes CPU/memory enough to stall the machine. Both scripts
+    sleep `@necromancer_resume_delay` (default 5s) after every
+    `@necromancer_resume_batch_size` (default 1) resumes — configurable via
+    tmux option, `NECROMANCER_RESUME_DELAY`/`NECROMANCER_RESUME_BATCH_SIZE`
+    env vars, or `--resume-delay`/`--resume-batch-size` CLI flags. Don't
+    remove the pacing to "simplify" the loop — the stall it prevents is real
+    and reproducible, not tests-passing.
+
 ## Testing
 
 Self-contained bash tests live in `tests/`. Each uses `mktemp -d` + `NECROMANCER_SNAPSHOT_DIR`
@@ -97,6 +123,9 @@ for full isolation — no live tmux server required. Run any test directly:
 bash tests/necro-autosave-lock-test.sh   # lock: only one concurrent autosave fires
 bash tests/necro-context-codex-test.sh   # context enrichment for Codex sessions
 bash tests/necro-prune-idle-window-test.sh  # prune kills idle windows, keeps busy ones
+bash tests/necro-agent-scrape-ps-resume-test.sh   # ps-argv is ground truth for pane UUID pinning
+bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts
+bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
 ```
 
 For restore/snapshot changes, run against an **isolated tmux socket**:
@@ -114,6 +143,10 @@ Key things to verify after any change to restore/snapshot:
 - restore run twice → second run adds 0 windows, resumes 0 agents
 - multi-agent: a `codex` record yields `codex resume <id>`
 - autosave log has no `mapfile` errors and honors `@necromancer_max_snapshots`
+- pinned UUID actually matches the pane's real process argv (not a stale or
+  subagent transcript from the filesystem fallback)
+- restoring multiple sessions pauses between resumes — doesn't fire every
+  `claude`/`codex --resume` back-to-back
 
 ## Troubleshooting
 
