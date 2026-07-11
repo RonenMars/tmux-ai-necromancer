@@ -26,24 +26,31 @@ case "\$1" in
   show-option)
     exit 0
     ;;
-  list-windows)
+  list-panes)
     case "\$*" in
-      *'#{@necro_id}'*'#{window_id}'*)
-        printf '\t@1\n'
+      *'#{@necro_id}'*'#{pane_id}'*)
+        printf '\t%%1\n'
         ;;
-      *'#{window_index}'*'#{window_name}'*'#{window_id}'*'#{pane_current_path}'*)
-        printf '1\tw\t@1\t$CWD\t\n'
+      *'#{window_index}'*'#{window_name}'*'#{pane_id}'*'#{pane_current_path}'*)
+        printf '1\tw\t%%1\t$CWD\t\n'
         ;;
       *)
-        printf '@1\n'
+        printf '%%1\n'
         ;;
     esac
+    ;;
+  list-windows)
+    printf '@1\n'
     ;;
   display-message)
     printf 'zsh\n'
     ;;
   new-window)
     echo "unexpected new-window" >&2
+    exit 9
+    ;;
+  split-window)
+    echo "unexpected split-window" >&2
     exit 9
     ;;
   list-sessions)
@@ -64,7 +71,7 @@ EOF
 
 out="$(bash "$ROOT/scripts/necro-restore.sh" --dry-run "$SNAP" 2>&1)"
 
-grep -F "existing window matches snapshot — claiming marker" <<<"$out" >/dev/null || {
+grep -F "existing pane matches snapshot — claiming marker" <<<"$out" >/dev/null || {
   echo "missing claim message" >&2
   echo "$out" >&2
   exit 1
