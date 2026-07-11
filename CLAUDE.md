@@ -55,11 +55,19 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    non-zero on no-match. With `pipefail` + `-e`, the first no-match silently
    kills the loop mid-walk. This bit the original tooling for real.
 
-2. **Restore is idempotent via a stable window marker (`@necro_id` =
-   `<cwd>|<uuid>`).** Do NOT key idempotency on window name (auto-renamed by the
-   shell after first prompt) or `pane_current_path` (unset right after window
-   creation). Re-running restore must add zero windows and re-resume zero
-   agents.
+2. **Restore is idempotent via a stable per-PANE marker (`@necro_id` =
+   `<cwd>|<uuid>`).** The marker is set on the *pane*, not the window, so that
+   several records sharing one `(session, window_index)` restore as splits in a
+   single window while each pane stays independently idempotent. Do NOT key
+   idempotency on window name (auto-renamed by the shell after first prompt) or
+   `pane_current_path` (unset right after creation). Re-running restore must add
+   zero windows/panes and re-resume zero agents.
+
+   Multi-pane grouping: within a single restore run, the first record for a
+   `(session, window_index)` creates/claims the window; later records with the
+   same key `split-window` into it (tracked via `WIN_FOR_GROUP`). This
+   reconstructs multi-pane windows instead of flattening each pane into its own
+   window.
 
 3. **Never `set -e`-abort on a tmux call in restore.** The predecessor died with
    `duplicate session: <name>` the moment a target already existed. Guard tmux

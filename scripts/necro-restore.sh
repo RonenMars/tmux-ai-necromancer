@@ -225,30 +225,32 @@ necro_hr
 
 run() { if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
 
-# Idempotency is keyed on a stable per-window marker we set ourselves:
-# the window option @necro_id = "<cwd>|<uuid>". Window names auto-rename and
-# pane_current_path is unreliable right after creation, so neither is safe to
-# match on across runs. The marker is set once when we create/claim a window
-# and survives everything.
+# Idempotency is keyed on a stable per-PANE marker we set ourselves: the pane
+# option @necro_id = "<cwd>|<uuid>". Marking panes (not windows) lets several
+# records that shared one window restore as splits in that window while each
+# stays independently idempotent. Window names auto-rename and pane_current_path
+# is unreliable right after creation, so neither is safe to match on across
+# runs. The marker is set once when we create/claim a pane and survives.
 NECRO_MARK="@necro_id"
 
-# Does a window already carry this marker in this session?
+# Does a pane already carry this marker in this session?
 window_marked() {
   local session="$1" mark="$2"
-  tmux list-windows -t "=$session" -F "#{$NECRO_MARK}" 2>/dev/null \
+  tmux list-panes -s -t "=$session" -F "#{$NECRO_MARK}" 2>/dev/null \
     | grep -qxF "$mark"
 }
 
-# Window id (@N) of the window carrying this marker ("" if none).
+# Pane id (%N) of the pane carrying this marker ("" if none).
 window_id_for_mark() {
   local session="$1" mark="$2"
-  tmux list-windows -t "=$session" -F "#{$NECRO_MARK}	#{window_id}" 2>/dev/null \
+  tmux list-panes -s -t "=$session" -F "#{$NECRO_MARK}	#{pane_id}" 2>/dev/null \
     | awk -F'\t' -v m="$mark" '$1==m {print $2; exit}'
 }
 
 unmarked_window_id_for_record() {
   local session="$1" win_idx="$2" win_name="$3" safe_name="$4" cwd="$5"
-  tmux list-windows -t "=$session" -F "#{window_index}	#{window_name}	#{window_id}	#{pane_current_path}	#{$NECRO_MARK}" 2>/dev/null \
+  tmux list-panes -s -t "=$session" \
+      -F "#{window_index}	#{window_name}	#{pane_id}	#{pane_current_path}	#{$NECRO_MARK}" 2>/dev/null \
     | awk -F'\t' -v idx="$win_idx" -v name="$win_name" -v safe="$safe_name" -v cwd="$cwd" \
         '$5 == "" && $4 == cwd && ($1 == idx || $2 == name || $2 == safe) { print $3; exit }'
 }
@@ -274,6 +276,9 @@ ensure_session() {
 
 stage 3 5 "validating records"
 restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; i=0
+# Window created/claimed for each (session, window_index) THIS run. Later records
+# in the same group split into that window instead of adding a new one.
+declare -A WIN_FOR_GROUP
 
 stage 4 5 "restoring windows and resuming agents"
 
@@ -317,56 +322,81 @@ while IFS= read -r line; do
 
   # Per-record stable marker. Falls back to pane_id when there's no uuid.
   mark="${cwd}|${uuid:-$pane_id}"
+  group="${session}|${win_idx}"
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
 
-  # Idempotency: claim matching unmarked windows first (tmux-resurrect creates
+  # Idempotency: claim matching unmarked panes first (tmux-resurrect creates
   # layout-only shells with no @necro_id), then fall back to existing markers.
-  # On a freshly-created session, claim its initial window for this record
-  # instead of adding a second.
+  # On a freshly-created session, claim its initial pane for this record
+  # instead of adding a second window.
   claim_id=""
   if [ "$session_fresh" = "0" ]; then
     claim_id="$(unmarked_window_id_for_record "$session" "$win_idx" "$win_name" "$safe_name" "$cwd")"
   fi
 
   if [ -n "$claim_id" ]; then
-    echo "  existing window matches snapshot — claiming marker"
-    window_id="$claim_id"
-    [ "$DRY_RUN" = "1" ] || tmux set-option -w -t "$window_id" "$NECRO_MARK" "$mark" 2>/dev/null || true
+    echo "  existing pane matches snapshot — claiming marker"
+    pane_target="$claim_id"
+    [ "$DRY_RUN" = "1" ] || tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
     reused=$((reused + 1))
-    cur_cmd="$(window_current_command "$window_id")"
+    cur_cmd="$(window_current_command "$pane_target")"
     if necro_is_idle_shell "$cur_cmd"; then
       fresh=1
     else
-      echo "  claimed window is busy ($cur_cmd) — not resuming"
+      echo "  claimed pane is busy ($cur_cmd) — not resuming"
       fresh=0
     fi
   elif window_marked "$session" "$mark"; then
     echo "  already restored (marker) — reusing"
     reused=$((reused + 1))
     fresh=0
-    window_id="$(window_id_for_mark "$session" "$mark")"
+    pane_target="$(window_id_for_mark "$session" "$mark")"
+  elif [ -n "${WIN_FOR_GROUP[$group]:-}" ]; then
+    # A window for this (session, window_index) was already created this run —
+    # this record was another pane in that window, so split into it.
+    necro_say "  splitting into window for '$safe_name'"
+    if [ "$DRY_RUN" = "1" ]; then
+      echo "  DRY: tmux split-window -t ${WIN_FOR_GROUP[$group]} -c $cwd (mark=$mark)"
+      pane_target=""
+    else
+      pane_target="$(tmux split-window -d -t "${WIN_FOR_GROUP[$group]}" -c "$cwd" -P -F '#{pane_id}' 2>/dev/null || true)"
+      [ -n "$pane_target" ] && tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
+    fi
+    restored=$((restored + 1))
+    fresh=1
   elif [ "$session_fresh" = "1" ]; then
-    # Claim the session's initial window for this record.
-    window_id="$(tmux list-windows -t "=$session" -F '#{window_id}' 2>/dev/null | head -1)"
-    [ "$DRY_RUN" = "1" ] || tmux set-option -w -t "$window_id" "$NECRO_MARK" "$mark" 2>/dev/null || true
+    # Claim the session's initial window's pane for this record.
+    if [ "$DRY_RUN" = "1" ]; then
+      pane_target=""; WIN_FOR_GROUP[$group]="=$session:dry"
+    else
+      pane_target="$(tmux list-panes -t "=$session" -F '#{pane_id}' 2>/dev/null | head -1)"
+      tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
+      WIN_FOR_GROUP[$group]="$(tmux list-windows -t "=$session" -F '#{window_id}' 2>/dev/null | head -1)"
+    fi
     restored=$((restored + 1))
     fresh=1
   else
     necro_say "  adding window '$safe_name'"
     if [ "$DRY_RUN" = "1" ]; then
       echo "  DRY: tmux new-window -t =$session -c $cwd -n $safe_name (mark=$mark)"
-      window_id=""
+      pane_target=""; WIN_FOR_GROUP[$group]="=$session:dry"
     else
       window_id="$(tmux new-window -d -t "=$session" -c "$cwd" -n "$safe_name" -P -F '#{window_id}' 2>/dev/null || true)"
-      [ -n "$window_id" ] && tmux set-option -w -t "$window_id" "$NECRO_MARK" "$mark" 2>/dev/null || true
+      if [ -n "$window_id" ]; then
+        WIN_FOR_GROUP[$group]="$window_id"
+        pane_target="$(tmux list-panes -t "$window_id" -F '#{pane_id}' 2>/dev/null | head -1)"
+        tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
+      else
+        pane_target=""
+      fi
     fi
     restored=$((restored + 1))
     fresh=1
   fi
 
-  # Target for send-keys: the window id (stable) we just resolved.
-  target="${window_id:-${session}:${safe_name}}"
+  # Target for send-keys: the pane id (stable) we just resolved.
+  target="${pane_target:-${session}:${safe_name}}"
 
   # Resume only into a freshly-created window with an agent + id. A reused
   # window already has its agent running (or the user's own work) — don't
