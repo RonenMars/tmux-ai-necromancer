@@ -12,8 +12,10 @@ CODEX_UUID_RE='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 CODEX_SESSIONS_DIR="$HOME/.codex/sessions"
 
 # Does this pane's foreground command belong to Codex?
+# tmux reports the native binary's truncated basename (e.g. "codex-aarch64-a"
+# for codex-aarch64-apple-darwin), not the "codex" wrapper — match that too.
 agent_codex_matches() {
-  [ "$1" = "codex" ]
+  case "$1" in codex|codex-*) return 0 ;; *) return 1 ;; esac
 }
 
 # Codex has no per-project dir; report the sessions root for diagnostics.
@@ -43,7 +45,9 @@ try:
 except Exception:
     sys.exit(0)
 p = o.get("payload", o)
-if p.get("cwd") == sys.argv[1]:
+# Codex canonicalizes cwd to lowercase; macOS FS is case-insensitive, so
+# compare case-folded (tb-PRs-follow == tb-prs-follow).
+if (p.get("cwd") or "").lower() == sys.argv[1].lower():
     sys.stdout.write(p.get("id", ""))
 ' "$cwd" 2>/dev/null)"
     [ -n "$id" ] && printf '%s\n' "$id"
