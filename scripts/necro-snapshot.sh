@@ -62,9 +62,10 @@ OUT="$SNAP_DIR/${TS}${suffix}.jsonl"
 # uuid_source: "scrollback" | "latest-jsonl" | "" (none)
 emit_record() {
   local pane_id="$1" session="$2" window_index="$3" window_name="$4" \
-        cwd="$5" prev_cmd="$6" agent="$7" uuid="$8" uuid_source="${9:-}"
+        cwd="$5" prev_cmd="$6" agent="$7" uuid="$8" uuid_source="${9:-}" \
+        window_layout="${10:-}"
   local now; now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-  printf '{"pane_id":%s,"session":%s,"window_index":%d,"window_name":%s,"cwd":%s,"prev_cmd":%s,"agent":%s,"uuid":%s,"uuid_source":%s,"captured_at":%s,"first_user":"","last_assistant":"","dest_session":"","dest_window_name":""}\n' \
+  printf '{"pane_id":%s,"session":%s,"window_index":%d,"window_name":%s,"cwd":%s,"prev_cmd":%s,"agent":%s,"uuid":%s,"uuid_source":%s,"window_layout":%s,"captured_at":%s,"first_user":"","last_assistant":"","dest_session":"","dest_window_name":""}\n' \
     "$(necro_json_escape "$pane_id")" \
     "$(necro_json_escape "$session")" \
     "$window_index" \
@@ -74,6 +75,7 @@ emit_record() {
     "$(necro_json_escape "$agent")" \
     "$(necro_json_escape "$uuid")" \
     "$(necro_json_escape "$uuid_source")" \
+    "$(necro_json_escape "$window_layout")" \
     "$(necro_json_escape "$now")" \
     >> "$OUT"
 }
@@ -110,11 +112,11 @@ echo "Snapshot will be written to: $OUT"
 echo
 
 snapshot=$(tmux list-panes -a -F \
-  '#{pane_id}	#{session_name}	#{window_index}	#{window_name}	#{pane_current_path}	#{pane_current_command}')
+  '#{pane_id}	#{session_name}	#{window_index}	#{window_name}	#{pane_current_path}	#{pane_current_command}	#{window_layout}')
 total=$(printf '%s\n' "$snapshot" | wc -l | tr -d ' ')
 i=0
 
-while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
+while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout; do
   [ -z "$pane_id" ] && continue
   i=$((i + 1))
   printf '\n[%d/%d] %s  %s:%s  %s  (cmd=%s)\n' \
@@ -129,10 +131,10 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
     found_agent="$(tmux show-option -pqv -t "$pane_id" @necro_agent 2>/dev/null || true)"
     if [ -n "$found_uuid" ] && [ -n "$found_agent" ]; then
       echo "  idle shell — pane-option id ($found_agent): $found_uuid"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$found_agent" "$found_uuid" "pane-option"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$found_agent" "$found_uuid" "pane-option" "$layout"
     else
       echo "  idle shell — no session found, recording without id"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "" "" ""
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "" "" "" "$layout"
     fi
     continue
   fi
@@ -140,7 +142,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
   # Not a known agent (node, vim, etc.) — record location only.
   if [ -z "$agent" ]; then
     echo "  not an AI agent (cmd=$cmd) — recording without id"
-    emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "" "" ""
+    emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "" "" "" "$layout"
     continue
   fi
 
@@ -154,10 +156,10 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
     fi
     if [ -n "$fb" ]; then
       echo "  --idle-only ($agent) — ${fb_source}: $fb"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "$fb_source"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "$fb_source" "$layout"
     else
       echo "  --idle-only ($agent) — no session found, recording without id"
-      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" ""
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" "" "$layout"
     fi
     continue
   fi
@@ -178,10 +180,10 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
       fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
       if [ -n "$fb" ]; then
         echo "  skipped — fallback id: $fb"
-        emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl"
+        emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl" "$layout"
       else
         echo "  skipped — no session found, recording without id"
-        emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" ""
+        emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" "" "$layout"
       fi
       continue ;;
   esac
@@ -206,7 +208,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd; do
       echo "  WARN: no id found in scrollback or filesystem"
     fi
   fi
-  emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$uuid" "$uuid_source"
+  emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$uuid" "$uuid_source" "$layout"
 done <<<"$snapshot"
 
 echo

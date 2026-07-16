@@ -7,7 +7,7 @@
 # Use this to reorganize a sprawling server; use necro-restore.sh to rebuild a
 # fresh/empty one.
 #
-# Usage: necro-apply.sh <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]
+# Usage: necro-apply.sh <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N] [--resume-message STR]
 set -uo pipefail
 
 _src="${BASH_SOURCE[0]}"
@@ -23,18 +23,21 @@ necro_init_log "$0"
 . "$SELF_DIR/../lib/agents.sh"
 necro_load_agents
 
-[ $# -ge 1 ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]"; exit 2; }
+[ $# -ge 1 ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N] [--resume-message STR]"; exit 2; }
 IN=""; DRY_RUN=0; RESUME_DELAY_OPT=""; RESUME_BATCH_SIZE_OPT=""
+RESUME_MESSAGE_OPT_SET=0; RESUME_MESSAGE_OPT=""; RESUME_MESSAGE_DELAY_OPT=""
 while [ $# -gt 0 ]; do
   case "$1" in
     --dry-run) DRY_RUN=1; shift ;;
     --resume-delay) RESUME_DELAY_OPT="${2:-}"; shift 2 ;;
     --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
+    --resume-message) RESUME_MESSAGE_OPT_SET=1; RESUME_MESSAGE_OPT="${2:-}"; shift 2 ;;
+    --resume-message-delay) RESUME_MESSAGE_DELAY_OPT="${2:-}"; shift 2 ;;
     -*) necro_err "Unknown flag: $1"; exit 2 ;;
     *)  IN="$1"; shift ;;
   esac
 done
-[ -n "$IN" ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]"; exit 2; }
+[ -n "$IN" ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N] [--resume-message STR]"; exit 2; }
 [ -f "$IN" ] || { necro_err "Not found: $IN"; exit 1; }
 command -v jq >/dev/null || { necro_err "jq not installed."; exit 1; }
 
@@ -81,9 +84,39 @@ resume_batch_size() {
   esac
 }
 
+# Message sent into each pane after a resume. Default 'continue'. Empty string
+# is an explicit off-switch at every tier (flag/env/tmux option).
+resume_message() {
+  if [ "$RESUME_MESSAGE_OPT_SET" = "1" ]; then
+    printf '%s' "$RESUME_MESSAGE_OPT"; return
+  fi
+  if [ -n "${NECROMANCER_RESUME_MESSAGE+x}" ]; then
+    printf '%s' "$NECROMANCER_RESUME_MESSAGE"; return
+  fi
+  local val; val="$(necro_tmux_option @necromancer_resume_message "__unset__")"
+  if [ "$val" = "__unset__" ]; then printf 'continue'; else printf '%s' "$val"; fi
+}
+
+resume_message_delay() {
+  local val
+  if [ -n "$RESUME_MESSAGE_DELAY_OPT" ]; then
+    val="$RESUME_MESSAGE_DELAY_OPT"
+  elif [ -n "${NECROMANCER_RESUME_MESSAGE_DELAY:-}" ]; then
+    val="$NECROMANCER_RESUME_MESSAGE_DELAY"
+  else
+    val="$(necro_tmux_option @necromancer_resume_message_delay "8")"
+  fi
+  case "$val" in
+    ''|*[!0-9.]*) printf '8' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
 RESUME_DELAY="$(resume_delay_seconds)"
 RESUME_BATCH="$(resume_batch_size)"
 RESUME_BATCH_COUNT=0
+RESUME_MESSAGE="$(resume_message)"
+RESUME_MESSAGE_DELAY="$(resume_message_delay)"
 
 match_route() {
   local cwd="$1" glob session root
@@ -134,6 +167,12 @@ while IFS= read -r line; do
       if [ -n "$resume_cmd" ]; then
         echo "  $resume_cmd"
         run tmux send-keys -t "$window_id" "$resume_cmd" Enter
+        # Nudge the freshly-resumed agent to pick up its task. Wait first so the
+        # message lands at the prompt, not on the agent's boot screen.
+        if [ -n "$RESUME_MESSAGE" ]; then
+          [ "$DRY_RUN" = "0" ] && sleep "$RESUME_MESSAGE_DELAY"
+          run tmux send-keys -t "$window_id" "$RESUME_MESSAGE" Enter
+        fi
         RESUME_BATCH_COUNT=$((RESUME_BATCH_COUNT + 1))
         if [ "$DRY_RUN" = "0" ] && [ "$((RESUME_BATCH_COUNT % RESUME_BATCH))" -eq 0 ]; then
           sleep "$RESUME_DELAY"

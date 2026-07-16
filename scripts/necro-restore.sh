@@ -36,6 +36,9 @@ FORCE_LARGE=0
 ALLOW_UNSAFE_CWD=0
 RESUME_DELAY_OPT=""
 RESUME_BATCH_SIZE_OPT=""
+RESUME_MESSAGE_OPT_SET=0
+RESUME_MESSAGE_OPT=""
+RESUME_MESSAGE_DELAY_OPT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -44,6 +47,8 @@ while [ $# -gt 0 ]; do
     --allow-unsafe-cwd) ALLOW_UNSAFE_CWD=1; shift ;;
     --resume-delay) RESUME_DELAY_OPT="${2:-}"; shift 2 ;;
     --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
+    --resume-message) RESUME_MESSAGE_OPT_SET=1; RESUME_MESSAGE_OPT="${2:-}"; shift 2 ;;
+    --resume-message-delay) RESUME_MESSAGE_DELAY_OPT="${2:-}"; shift 2 ;;
     -h|--help)
       cat <<'H'
 necro-restore.sh — recreate AI-agent tmux sessions from a snapshot.
@@ -56,6 +61,8 @@ Usage:
   necro-restore.sh --allow-unsafe-cwd
   necro-restore.sh --resume-delay N        seconds between resume batches (default 5)
   necro-restore.sh --resume-batch-size N   resumes per batch before pausing (default 1)
+  necro-restore.sh --resume-message STR    text sent to each pane after resume (default 'continue', '' disables)
+  necro-restore.sh --resume-message-delay N  seconds to wait before that message (default 8)
 
 Config:
   NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES or @necromancer_max_claude_transcript_bytes
@@ -72,6 +79,14 @@ Config:
       How many resumes to launch before pausing for the delay (default 1 —
       pause after every single resume). Raise this to let a few launches
       fire back-to-back between pauses. --resume-batch-size overrides both.
+  NECROMANCER_RESUME_MESSAGE or @necromancer_resume_message
+      Text sent into each pane after its resume so the agent picks up its
+      task (default 'continue'). Empty string disables it. --resume-message
+      overrides both.
+  NECROMANCER_RESUME_MESSAGE_DELAY or @necromancer_resume_message_delay
+      Seconds to wait after resuming before sending that message, so it lands
+      at the prompt not the boot screen (default 8). --resume-message-delay
+      overrides both.
 
 Idempotent: reuses existing sessions/windows; resumes only into fresh panes.
 H
@@ -153,6 +168,34 @@ resume_batch_size() {
   esac
 }
 
+# Message sent into each pane after a resume. Default 'continue'. Empty string
+# is an explicit off-switch at every tier (flag/env/tmux option).
+resume_message() {
+  if [ "$RESUME_MESSAGE_OPT_SET" = "1" ]; then
+    printf '%s' "$RESUME_MESSAGE_OPT"; return
+  fi
+  if [ -n "${NECROMANCER_RESUME_MESSAGE+x}" ]; then
+    printf '%s' "$NECROMANCER_RESUME_MESSAGE"; return
+  fi
+  local val; val="$(necro_tmux_option @necromancer_resume_message "__unset__")"
+  if [ "$val" = "__unset__" ]; then printf 'continue'; else printf '%s' "$val"; fi
+}
+
+resume_message_delay() {
+  local val
+  if [ -n "$RESUME_MESSAGE_DELAY_OPT" ]; then
+    val="$RESUME_MESSAGE_DELAY_OPT"
+  elif [ -n "${NECROMANCER_RESUME_MESSAGE_DELAY:-}" ]; then
+    val="$NECROMANCER_RESUME_MESSAGE_DELAY"
+  else
+    val="$(necro_tmux_option @necromancer_resume_message_delay "8")"
+  fi
+  case "$val" in
+    ''|*[!0-9.]*) printf '8' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
 unsafe_cwd_patterns() {
   local val
   if [ "${NECROMANCER_UNSAFE_CWD_PATTERNS+x}" = "x" ]; then
@@ -210,6 +253,8 @@ max_claude_bytes="$(max_claude_transcript_bytes)"
 resume_delay="$(resume_delay_seconds)"
 resume_batch="$(resume_batch_size)"
 resume_batch_count=0
+resume_message="$(resume_message)"
+resume_message_delay="$(resume_message_delay)"
 
 necro_hr
 necro_say "Necromancer restore"
@@ -218,6 +263,11 @@ echo "  Records:  $total_records"
 echo "  Dry-run:  $DRY_RUN"
 echo "  Max Claude transcript: $(format_bytes "$max_claude_bytes") ($max_claude_bytes bytes)"
 echo "  Resume pacing: ${resume_delay}s pause every ${resume_batch} resume(s)"
+if [ -n "$resume_message" ]; then
+  echo "  Post-resume message: '$resume_message' after ${resume_message_delay}s"
+else
+  echo "  Post-resume message: (none)"
+fi
 echo "  Force large Claude transcripts: $FORCE_LARGE"
 echo "  Allow unsafe cwd paths: $ALLOW_UNSAFE_CWD"
 echo "  Unsafe cwd patterns: $(unsafe_cwd_patterns || true)"
@@ -279,6 +329,8 @@ restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; i=0
 # Window created/claimed for each (session, window_index) THIS run. Later records
 # in the same group split into that window instead of adding a new one.
 declare -A WIN_FOR_GROUP
+declare -A LAYOUT_FOR_GROUP
+declare -A PANE_COUNT_FOR_GROUP
 
 stage 4 5 "restoring windows and resuming agents"
 
@@ -300,6 +352,7 @@ while IFS= read -r line; do
   cwd=$(jq -r '.cwd // empty' <<<"$line")
   agent=$(jq -r '.agent // empty' <<<"$line")
   uuid=$(jq -r '.uuid // empty' <<<"$line")
+  layout=$(jq -r '.window_layout // empty' <<<"$line")
 
   if [ -z "$session" ] || [ -z "$cwd" ]; then
     progress_record "$i" "$total_records" "skipping record: missing session or cwd"
@@ -323,6 +376,10 @@ while IFS= read -r line; do
   # Per-record stable marker. Falls back to pane_id when there's no uuid.
   mark="${cwd}|${uuid:-$pane_id}"
   group="${session}|${win_idx}"
+
+  # Track saved pane count + layout per group for the post-loop layout replay.
+  PANE_COUNT_FOR_GROUP[$group]=$(( ${PANE_COUNT_FOR_GROUP[$group]:-0} + 1 ))
+  [ -n "$layout" ] && [ -z "${LAYOUT_FOR_GROUP[$group]:-}" ] && LAYOUT_FOR_GROUP[$group]="$layout"
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
 
@@ -413,6 +470,12 @@ while IFS= read -r line; do
     if [ -n "$resume_cmd" ]; then
       echo "  resume: $resume_cmd"
       run tmux send-keys -t "$target" "$resume_cmd" Enter
+      # Nudge the freshly-resumed agent to pick up its task. Wait first so the
+      # message lands at the prompt, not on the agent's boot screen.
+      if [ -n "$resume_message" ]; then
+        [ "$DRY_RUN" = "0" ] && sleep "$resume_message_delay"
+        run tmux send-keys -t "$target" "$resume_message" Enter
+      fi
       resumed=$((resumed + 1))
       resume_batch_count=$((resume_batch_count + 1))
       # Pace launches in batches — each resume reads a transcript + hits the
@@ -433,6 +496,26 @@ while IFS= read -r line; do
     resume_skipped=$((resume_skipped + 1))
   fi
 done < "$SNAPSHOT"
+
+# Replay saved pane layouts onto windows this run created. Only when the live
+# pane count matches the saved count — never stomp a window whose shape changed.
+for group in "${!LAYOUT_FOR_GROUP[@]}"; do
+  win="${WIN_FOR_GROUP[$group]:-}"
+  layout="${LAYOUT_FOR_GROUP[$group]}"
+  [ -z "$win" ] && continue
+  case "$win" in *:dry) continue ;; esac
+  saved="${PANE_COUNT_FOR_GROUP[$group]:-0}"
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  DRY: select-layout -t $win $layout"
+    continue
+  fi
+  live="$(tmux list-panes -t "$win" -F '#{pane_id}' 2>/dev/null | grep -c . || true)"
+  if [ "$live" = "$saved" ]; then
+    tmux select-layout -t "$win" "$layout" 2>/dev/null || true
+  else
+    echo "  layout skipped for $group: pane count $live != $saved"
+  fi
+done
 
 stage 5 5 "cleanup"
 necro_hr

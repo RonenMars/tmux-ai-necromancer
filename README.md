@@ -130,6 +130,8 @@ set -g @necromancer_status           'on'            # show status-right indicat
 set -g @necromancer_status_label     'necro'         # label for the indicator
 set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
+set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
+set -g @necromancer_resume_message_delay '8'  # seconds to wait before sending that message
 ```
 
 `@necromancer_resume_delay` / `@necromancer_resume_batch_size` govern
@@ -141,6 +143,22 @@ Raise `@necromancer_resume_batch_size` to let a few resumes fire together
 before each pause, or override per-invocation with `--resume-delay N` /
 `--resume-batch-size N` (or `NECROMANCER_RESUME_DELAY` /
 `NECROMANCER_RESUME_BATCH_SIZE`).
+
+After each resume, both scripts send a follow-up message into the pane —
+`@necromancer_resume_message` (default `continue`) — so the resumed agent picks
+up its in-progress task without you retyping anything. It waits
+`@necromancer_resume_message_delay` seconds first (default 8) so the message
+lands at the prompt, not on the agent's boot screen. Set the message to an empty
+string (`''`, or `--resume-message ''`) to disable it. Caveat: if the last turn
+ended by asking *you* a question, an auto-sent `continue` answers it blindly —
+disable the message when that matters. Also configurable via `--resume-message` /
+`--resume-message-delay` and `NECROMANCER_RESUME_MESSAGE` /
+`NECROMANCER_RESUME_MESSAGE_DELAY`.
+
+Snapshots also record each pane's `window_layout`, and restore replays it with
+`select-layout` so a multi-pane window comes back with its original arrangement
+and sizes — but only when the restored pane count matches the snapshot's, so a
+partially-restored or user-modified window is never reshaped.
 
 The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
 with prior Claude-only setups). Override with the option above or the
