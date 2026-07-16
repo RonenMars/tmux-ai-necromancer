@@ -61,6 +61,8 @@ Usage:
   necro-restore.sh --allow-unsafe-cwd
   necro-restore.sh --resume-delay N        seconds between resume batches (default 5)
   necro-restore.sh --resume-batch-size N   resumes per batch before pausing (default 1)
+  necro-restore.sh --resume-message STR    text sent to each pane after resume (default 'continue', '' disables)
+  necro-restore.sh --resume-message-delay N  seconds to wait before that message (default 8)
 
 Config:
   NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES or @necromancer_max_claude_transcript_bytes
@@ -77,6 +79,14 @@ Config:
       How many resumes to launch before pausing for the delay (default 1 —
       pause after every single resume). Raise this to let a few launches
       fire back-to-back between pauses. --resume-batch-size overrides both.
+  NECROMANCER_RESUME_MESSAGE or @necromancer_resume_message
+      Text sent into each pane after its resume so the agent picks up its
+      task (default 'continue'). Empty string disables it. --resume-message
+      overrides both.
+  NECROMANCER_RESUME_MESSAGE_DELAY or @necromancer_resume_message_delay
+      Seconds to wait after resuming before sending that message, so it lands
+      at the prompt not the boot screen (default 8). --resume-message-delay
+      overrides both.
 
 Idempotent: reuses existing sessions/windows; resumes only into fresh panes.
 H

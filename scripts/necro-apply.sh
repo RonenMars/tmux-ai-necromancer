@@ -7,7 +7,7 @@
 # Use this to reorganize a sprawling server; use necro-restore.sh to rebuild a
 # fresh/empty one.
 #
-# Usage: necro-apply.sh <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]
+# Usage: necro-apply.sh <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N] [--resume-message STR]
 set -uo pipefail
 
 _src="${BASH_SOURCE[0]}"
@@ -23,7 +23,7 @@ necro_init_log "$0"
 . "$SELF_DIR/../lib/agents.sh"
 necro_load_agents
 
-[ $# -ge 1 ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]"; exit 2; }
+[ $# -ge 1 ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N] [--resume-message STR]"; exit 2; }
 IN=""; DRY_RUN=0; RESUME_DELAY_OPT=""; RESUME_BATCH_SIZE_OPT=""
 RESUME_MESSAGE_OPT_SET=0; RESUME_MESSAGE_OPT=""; RESUME_MESSAGE_DELAY_OPT=""
 while [ $# -gt 0 ]; do
@@ -37,7 +37,7 @@ while [ $# -gt 0 ]; do
     *)  IN="$1"; shift ;;
   esac
 done
-[ -n "$IN" ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N]"; exit 2; }
+[ -n "$IN" ] || { necro_err "Usage: $0 <snapshot.jsonl> [--dry-run] [--resume-delay N] [--resume-batch-size N] [--resume-message STR]"; exit 2; }
 [ -f "$IN" ] || { necro_err "Not found: $IN"; exit 1; }
 command -v jq >/dev/null || { necro_err "jq not installed."; exit 1; }
 

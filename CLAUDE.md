@@ -139,6 +139,10 @@ bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp do
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
+bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
+bash tests/necro-restore-layout-test.sh           # restore replays window_layout via select-layout
+bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)
+bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume message too
 ```
 
 For restore/snapshot changes, run against an **isolated tmux socket**:
@@ -160,6 +164,10 @@ Key things to verify after any change to restore/snapshot:
   subagent transcript from the filesystem fallback)
 - restoring multiple sessions pauses between resumes — doesn't fire every
   `claude`/`codex --resume` back-to-back
+- restored multi-pane windows get their saved layout re-applied
+  (`select-layout`) only when the live pane count matches the snapshot's
+- resumed panes receive the configured post-resume message (default `continue`)
+  after the resume, and none when the message is set empty
 
 ## Troubleshooting
 
