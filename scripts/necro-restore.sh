@@ -460,6 +460,12 @@ while IFS= read -r line; do
     if [ -n "$resume_cmd" ]; then
       echo "  resume: $resume_cmd"
       run tmux send-keys -t "$target" "$resume_cmd" Enter
+      # Nudge the freshly-resumed agent to pick up its task. Wait first so the
+      # message lands at the prompt, not on the agent's boot screen.
+      if [ -n "$resume_message" ]; then
+        [ "$DRY_RUN" = "0" ] && sleep "$resume_message_delay"
+        run tmux send-keys -t "$target" "$resume_message" Enter
+      fi
       resumed=$((resumed + 1))
       resume_batch_count=$((resume_batch_count + 1))
       # Pace launches in batches — each resume reads a transcript + hits the

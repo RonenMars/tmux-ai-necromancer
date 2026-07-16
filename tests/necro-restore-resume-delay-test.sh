@@ -12,6 +12,9 @@ trap 'rm -rf "$TMP"' EXIT
 
 export HOME="$TMP/home"
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
+# This test measures resume pacing only; disable the post-resume message so its
+# separate delay doesn't perturb the wall-clock timing assertions below.
+export NECROMANCER_RESUME_MESSAGE=""
 mkdir -p "$HOME" "$NECROMANCER_SNAPSHOT_DIR"
 
 TMPBIN="$TMP/bin"
