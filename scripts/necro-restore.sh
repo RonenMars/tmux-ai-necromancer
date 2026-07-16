@@ -36,6 +36,9 @@ FORCE_LARGE=0
 ALLOW_UNSAFE_CWD=0
 RESUME_DELAY_OPT=""
 RESUME_BATCH_SIZE_OPT=""
+RESUME_MESSAGE_OPT_SET=0
+RESUME_MESSAGE_OPT=""
+RESUME_MESSAGE_DELAY_OPT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -44,6 +47,8 @@ while [ $# -gt 0 ]; do
     --allow-unsafe-cwd) ALLOW_UNSAFE_CWD=1; shift ;;
     --resume-delay) RESUME_DELAY_OPT="${2:-}"; shift 2 ;;
     --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
+    --resume-message) RESUME_MESSAGE_OPT_SET=1; RESUME_MESSAGE_OPT="${2:-}"; shift 2 ;;
+    --resume-message-delay) RESUME_MESSAGE_DELAY_OPT="${2:-}"; shift 2 ;;
     -h|--help)
       cat <<'H'
 necro-restore.sh — recreate AI-agent tmux sessions from a snapshot.
@@ -153,6 +158,34 @@ resume_batch_size() {
   esac
 }
 
+# Message sent into each pane after a resume. Default 'continue'. Empty string
+# is an explicit off-switch at every tier (flag/env/tmux option).
+resume_message() {
+  if [ "$RESUME_MESSAGE_OPT_SET" = "1" ]; then
+    printf '%s' "$RESUME_MESSAGE_OPT"; return
+  fi
+  if [ -n "${NECROMANCER_RESUME_MESSAGE+x}" ]; then
+    printf '%s' "$NECROMANCER_RESUME_MESSAGE"; return
+  fi
+  local val; val="$(necro_tmux_option @necromancer_resume_message "__unset__")"
+  if [ "$val" = "__unset__" ]; then printf 'continue'; else printf '%s' "$val"; fi
+}
+
+resume_message_delay() {
+  local val
+  if [ -n "$RESUME_MESSAGE_DELAY_OPT" ]; then
+    val="$RESUME_MESSAGE_DELAY_OPT"
+  elif [ -n "${NECROMANCER_RESUME_MESSAGE_DELAY:-}" ]; then
+    val="$NECROMANCER_RESUME_MESSAGE_DELAY"
+  else
+    val="$(necro_tmux_option @necromancer_resume_message_delay "8")"
+  fi
+  case "$val" in
+    ''|*[!0-9.]*) printf '8' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
 unsafe_cwd_patterns() {
   local val
   if [ "${NECROMANCER_UNSAFE_CWD_PATTERNS+x}" = "x" ]; then
@@ -210,6 +243,8 @@ max_claude_bytes="$(max_claude_transcript_bytes)"
 resume_delay="$(resume_delay_seconds)"
 resume_batch="$(resume_batch_size)"
 resume_batch_count=0
+resume_message="$(resume_message)"
+resume_message_delay="$(resume_message_delay)"
 
 necro_hr
 necro_say "Necromancer restore"
@@ -218,6 +253,11 @@ echo "  Records:  $total_records"
 echo "  Dry-run:  $DRY_RUN"
 echo "  Max Claude transcript: $(format_bytes "$max_claude_bytes") ($max_claude_bytes bytes)"
 echo "  Resume pacing: ${resume_delay}s pause every ${resume_batch} resume(s)"
+if [ -n "$resume_message" ]; then
+  echo "  Post-resume message: '$resume_message' after ${resume_message_delay}s"
+else
+  echo "  Post-resume message: (none)"
+fi
 echo "  Force large Claude transcripts: $FORCE_LARGE"
 echo "  Allow unsafe cwd paths: $ALLOW_UNSAFE_CWD"
 echo "  Unsafe cwd patterns: $(unsafe_cwd_patterns || true)"
