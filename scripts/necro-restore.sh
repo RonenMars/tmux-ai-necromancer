@@ -279,6 +279,8 @@ restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; i=0
 # Window created/claimed for each (session, window_index) THIS run. Later records
 # in the same group split into that window instead of adding a new one.
 declare -A WIN_FOR_GROUP
+declare -A LAYOUT_FOR_GROUP
+declare -A PANE_COUNT_FOR_GROUP
 
 stage 4 5 "restoring windows and resuming agents"
 
@@ -300,6 +302,7 @@ while IFS= read -r line; do
   cwd=$(jq -r '.cwd // empty' <<<"$line")
   agent=$(jq -r '.agent // empty' <<<"$line")
   uuid=$(jq -r '.uuid // empty' <<<"$line")
+  layout=$(jq -r '.window_layout // empty' <<<"$line")
 
   if [ -z "$session" ] || [ -z "$cwd" ]; then
     progress_record "$i" "$total_records" "skipping record: missing session or cwd"
@@ -323,6 +326,10 @@ while IFS= read -r line; do
   # Per-record stable marker. Falls back to pane_id when there's no uuid.
   mark="${cwd}|${uuid:-$pane_id}"
   group="${session}|${win_idx}"
+
+  # Track saved pane count + layout per group for the post-loop layout replay.
+  PANE_COUNT_FOR_GROUP[$group]=$(( ${PANE_COUNT_FOR_GROUP[$group]:-0} + 1 ))
+  [ -n "$layout" ] && [ -z "${LAYOUT_FOR_GROUP[$group]:-}" ] && LAYOUT_FOR_GROUP[$group]="$layout"
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
 
@@ -433,6 +440,26 @@ while IFS= read -r line; do
     resume_skipped=$((resume_skipped + 1))
   fi
 done < "$SNAPSHOT"
+
+# Replay saved pane layouts onto windows this run created. Only when the live
+# pane count matches the saved count — never stomp a window whose shape changed.
+for group in "${!LAYOUT_FOR_GROUP[@]}"; do
+  win="${WIN_FOR_GROUP[$group]:-}"
+  layout="${LAYOUT_FOR_GROUP[$group]}"
+  [ -z "$win" ] && continue
+  case "$win" in *:dry) continue ;; esac
+  saved="${PANE_COUNT_FOR_GROUP[$group]:-0}"
+  if [ "$DRY_RUN" = "1" ]; then
+    echo "  DRY: select-layout -t $win $layout"
+    continue
+  fi
+  live="$(tmux list-panes -t "$win" -F '#{pane_id}' 2>/dev/null | grep -c . || true)"
+  if [ "$live" = "$saved" ]; then
+    tmux select-layout -t "$win" "$layout" 2>/dev/null || true
+  else
+    echo "  layout skipped for $group: pane count $live != $saved"
+  fi
+done
 
 stage 5 5 "cleanup"
 necro_hr
