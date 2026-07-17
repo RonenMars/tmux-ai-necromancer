@@ -150,6 +150,27 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     sessions (no `--resume` in argv, nothing in scrollback), so this is not an
     edge case.
 
+13. **Every script must run under macOS's stock `/bin/bash` 3.2 — no bash-4
+    constructs anywhere, not just the status-right path.** Invariants 4 and 8
+    forbid `mapfile`/assoc-arrays in the `/bin/sh` status-right path;
+    invariant 13 extends the *no-bash-4* rule to the whole plugin. The
+    shebang is `#!/usr/bin/env bash`, so which bash runs is decided by the
+    PATH of whatever started the tmux server — and tmux `run-shell` /
+    `display-popup` (the restore keybind, the menu, `necro-reboot-resume.sh`)
+    inherit that PATH. On a stock macOS box with no Homebrew bash, `env bash`
+    is `/bin/bash` 3.2. `necro-restore.sh` once used `declare -A`; under 3.2
+    that errors, the `session|win_idx` group key then arithmetic-evaluates as
+    an *indexed* subscript (`session | win_idx` = bitwise OR of an unset
+    identifier), and `set -u` aborts the loop on the FIRST record — a **silent
+    0-session restore** (exit 0, nothing rebuilt, errors buried in the log by
+    `necro_init_log`'s `exec > >(tee)`). This is the plugin's worst failure
+    mode, and tests never caught it because they invoke `bash <script>` which
+    resolves the developer's Homebrew bash 5. The group maps now use
+    hex-encoded dynamically-named scalars (`group_get`/`group_set`). When
+    adding string→value maps, do the same; never reach for `declare -A`.
+    Verify new/changed scripts with `bash -n` under `/bin/bash` AND run the
+    restore suite with the script forced onto 3.2.
+
 ## Testing
 
 Self-contained bash tests live in `tests/`. Each uses `mktemp -d` + `NECROMANCER_SNAPSHOT_DIR`
@@ -179,6 +200,7 @@ bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the p
 bash tests/necro-restore-layout-test.sh           # restore replays window_layout via select-layout
 bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)
 bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume message too
+bash tests/necro-restore-bash32-test.sh           # restore runs clean under stock /bin/bash 3.2 (no declare -A)
 ```
 
 For restore/snapshot changes, run against an **isolated tmux socket**:

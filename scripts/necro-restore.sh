@@ -328,9 +328,27 @@ stage 3 5 "validating records"
 restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; i=0
 # Window created/claimed for each (session, window_index) THIS run. Later records
 # in the same group split into that window instead of adding a new one.
-declare -A WIN_FOR_GROUP
-declare -A LAYOUT_FOR_GROUP
-declare -A PANE_COUNT_FOR_GROUP
+#
+# Backed by dynamically-named scalars, not `declare -A`: macOS ships /bin/bash
+# 3.2, where associative arrays don't exist. `declare -A` there errors, the
+# group key then arithmetic-evaluates as an indexed subscript, and `set -u`
+# aborts the loop on the first record — a silent 0-session restore.
+#
+# Keys are arbitrary strings ("session|win_idx"); each is hex-encoded into the
+# var-name suffix so distinct keys can never collide (a lossy collapse would
+# cross-wire sessions differing only in punctuation, e.g. my.app vs my-app —
+# the same class of bug as invariant 11). Seen keys are recorded newline-
+# delimited in GROUP_KEYS so post-loop iteration survives keys with spaces.
+GROUP_KEYS=""  # newline-separated group keys seen this run
+group_var() { printf 'GRP_%s_%s' "$2" "$(printf '%s' "$1" | od -An -tx1 | tr -d ' \n')"; }
+group_get() { eval "printf '%s' \"\${$(group_var "$1" "$2"):-${3:-}}\""; }  # $3 = default
+group_set() {
+  case "
+$GROUP_KEYS" in *"
+$1"*) ;; *) GROUP_KEYS="$GROUP_KEYS
+$1" ;; esac
+  eval "$(group_var "$1" "$2")=\$3"
+}
 
 stage 4 5 "restoring windows and resuming agents"
 
@@ -378,8 +396,8 @@ while IFS= read -r line; do
   group="${session}|${win_idx}"
 
   # Track saved pane count + layout per group for the post-loop layout replay.
-  PANE_COUNT_FOR_GROUP[$group]=$(( ${PANE_COUNT_FOR_GROUP[$group]:-0} + 1 ))
-  [ -n "$layout" ] && [ -z "${LAYOUT_FOR_GROUP[$group]:-}" ] && LAYOUT_FOR_GROUP[$group]="$layout"
+  group_set "$group" count "$(( $(group_get "$group" count 0) + 1 ))"
+  [ -n "$layout" ] && [ -z "$(group_get "$group" layout)" ] && group_set "$group" layout "$layout"
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
 
@@ -402,9 +420,9 @@ while IFS= read -r line; do
     # to `new-window` — flattening a multi-pane window into separate windows
     # (the invariant-2 regression) and skipping the layout replay, which
     # requires WIN_FOR_GROUP to be set.
-    if [ "$DRY_RUN" = "0" ] && [ -z "${WIN_FOR_GROUP[$group]:-}" ]; then
+    if [ "$DRY_RUN" = "0" ] && [ -z "$(group_get "$group" win)" ]; then
       claimed_win="$(tmux display-message -p -t "$pane_target" '#{window_id}' 2>/dev/null || true)"
-      [ -n "$claimed_win" ] && WIN_FOR_GROUP[$group]="$claimed_win"
+      [ -n "$claimed_win" ] && group_set "$group" win "$claimed_win"
     fi
     reused=$((reused + 1))
     cur_cmd="$(window_current_command "$pane_target")"
@@ -419,15 +437,15 @@ while IFS= read -r line; do
     reused=$((reused + 1))
     fresh=0
     pane_target="$(window_id_for_mark "$session" "$mark")"
-  elif [ -n "${WIN_FOR_GROUP[$group]:-}" ]; then
+  elif [ -n "$(group_get "$group" win)" ]; then
     # A window for this (session, window_index) was already created this run —
     # this record was another pane in that window, so split into it.
     necro_say "  splitting into window for '$safe_name'"
     if [ "$DRY_RUN" = "1" ]; then
-      echo "  DRY: tmux split-window -t ${WIN_FOR_GROUP[$group]} -c $cwd (mark=$mark)"
+      echo "  DRY: tmux split-window -t $(group_get "$group" win) -c $cwd (mark=$mark)"
       pane_target=""
     else
-      pane_target="$(tmux split-window -d -t "${WIN_FOR_GROUP[$group]}" -c "$cwd" -P -F '#{pane_id}' 2>/dev/null || true)"
+      pane_target="$(tmux split-window -d -t "$(group_get "$group" win)" -c "$cwd" -P -F '#{pane_id}' 2>/dev/null || true)"
       [ -n "$pane_target" ] && tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
     fi
     restored=$((restored + 1))
@@ -435,11 +453,11 @@ while IFS= read -r line; do
   elif [ "$session_fresh" = "1" ]; then
     # Claim the session's initial window's pane for this record.
     if [ "$DRY_RUN" = "1" ]; then
-      pane_target=""; WIN_FOR_GROUP[$group]="=$session:dry"
+      pane_target=""; group_set "$group" win "=$session:dry"
     else
       pane_target="$(tmux list-panes -t "=$session" -F '#{pane_id}' 2>/dev/null | head -1)"
       tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
-      WIN_FOR_GROUP[$group]="$(tmux list-windows -t "=$session" -F '#{window_id}' 2>/dev/null | head -1)"
+      group_set "$group" win "$(tmux list-windows -t "=$session" -F '#{window_id}' 2>/dev/null | head -1)"
     fi
     restored=$((restored + 1))
     fresh=1
@@ -447,11 +465,11 @@ while IFS= read -r line; do
     necro_say "  adding window '$safe_name'"
     if [ "$DRY_RUN" = "1" ]; then
       echo "  DRY: tmux new-window -t =$session -c $cwd -n $safe_name (mark=$mark)"
-      pane_target=""; WIN_FOR_GROUP[$group]="=$session:dry"
+      pane_target=""; group_set "$group" win "=$session:dry"
     else
       window_id="$(tmux new-window -d -t "=$session" -c "$cwd" -n "$safe_name" -P -F '#{window_id}' 2>/dev/null || true)"
       if [ -n "$window_id" ]; then
-        WIN_FOR_GROUP[$group]="$window_id"
+        group_set "$group" win "$window_id"
         pane_target="$(tmux list-panes -t "$window_id" -F '#{pane_id}' 2>/dev/null | head -1)"
         tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
       else
@@ -509,12 +527,14 @@ done < "$SNAPSHOT"
 
 # Replay saved pane layouts onto windows this run created. Only when the live
 # pane count matches the saved count — never stomp a window whose shape changed.
-for group in "${!LAYOUT_FOR_GROUP[@]}"; do
-  win="${WIN_FOR_GROUP[$group]:-}"
-  layout="${LAYOUT_FOR_GROUP[$group]}"
+while IFS= read -r group; do
+  [ -z "$group" ] && continue
+  layout="$(group_get "$group" layout)"
+  [ -z "$layout" ] && continue
+  win="$(group_get "$group" win)"
   [ -z "$win" ] && continue
   case "$win" in *:dry) continue ;; esac
-  saved="${PANE_COUNT_FOR_GROUP[$group]:-0}"
+  saved="$(group_get "$group" count 0)"
   if [ "$DRY_RUN" = "1" ]; then
     echo "  DRY: select-layout -t $win $layout"
     continue
@@ -525,7 +545,9 @@ for group in "${!LAYOUT_FOR_GROUP[@]}"; do
   else
     echo "  layout skipped for $group: pane count $live != $saved"
   fi
-done
+done <<EOF
+$GROUP_KEYS
+EOF
 
 stage 5 5 "cleanup"
 necro_hr
