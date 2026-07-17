@@ -23,10 +23,14 @@ IN="$1"
 OUT="${IN%.jsonl}.enriched.jsonl"
 
 # Python does the heavy lifting: it knows each agent's transcript layout.
+# Writes to a temp file and renames only on success — a partially-written
+# enriched file must never be pinned as the reboot target (reboot-prep only
+# checks that the file exists).
 python3 - "$IN" "$OUT" "$HOME" <<'PY'
 import json, os, sys
 
 in_path, out_path, home = sys.argv[1], sys.argv[2], sys.argv[3]
+tmp_path = out_path + ".tmp"
 
 def text_of(content):
     if isinstance(content, str):
@@ -43,7 +47,9 @@ def is_real_user(t):
     return True
 
 def claude_path(uuid, cwd):
-    enc = cwd.replace("/", "-")
+    # Claude encodes '/', '.' and '_' all as '-'. Must match
+    # agent_claude_project_dir in lib/agents/claude.sh.
+    enc = cwd.replace("/", "-").replace(".", "-").replace("_", "-")
     return os.path.join(home, ".claude", "projects", enc, f"{uuid}.jsonl")
 
 def codex_path(uuid, cwd):
@@ -82,11 +88,20 @@ def previews(agent, uuid, cwd):
         return "", ""
     return first_user, last_assistant
 
-with open(in_path) as fin, open(out_path, "w") as fout:
+skipped = 0
+with open(in_path) as fin, open(tmp_path, "w") as fout:
     for line in fin:
         line = line.strip()
         if not line: continue
-        obj = json.loads(line)
+        # A malformed record must not abort the run: restore tolerates these,
+        # so they occur in practice, and a half-written enriched file can be
+        # pinned as the reboot target and silently lose every later session.
+        try:
+            obj = json.loads(line)
+        except Exception:
+            skipped += 1
+            fout.write(line + "\n")  # pass through untouched
+            continue
         uuid = obj.get("uuid", ""); cwd = obj.get("cwd", ""); agent = obj.get("agent", "")
         if uuid and cwd and agent:
             fu, la = previews(agent, uuid, cwd)
@@ -94,5 +109,8 @@ with open(in_path) as fin, open(out_path, "w") as fout:
             obj["last_assistant"] = la
         fout.write(json.dumps(obj) + "\n")
 
+os.replace(tmp_path, out_path)
+if skipped:
+    print(f"Warning: passed through {skipped} malformed record(s) unenriched")
 print(f"Enriched: {out_path}")
 PY

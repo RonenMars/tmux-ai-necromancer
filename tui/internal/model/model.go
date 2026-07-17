@@ -172,11 +172,16 @@ type agentSpec struct {
 	exitKeys string
 }
 
+// agentForCommand mirrors the bash adapters' matching rules (lib/agents/*.sh).
+// Keep the two in sync: tmux reports the native binary's truncated basename
+// (e.g. "codex-aarch64-a" for codex-aarch64-apple-darwin), not the "codex"
+// wrapper, so an exact-match-only check silently fails to see real Codex panes.
 func agentForCommand(s string) (agentSpec, bool) {
-	switch strings.TrimSpace(s) {
-	case "claude":
+	cmd := strings.TrimSpace(s)
+	switch {
+	case cmd == "claude":
 		return agentSpec{name: "claude", exitKeys: "/exit"}, true
-	case "codex":
+	case cmd == "codex" || strings.HasPrefix(cmd, "codex-"):
 		return agentSpec{name: "codex", exitKeys: "/quit"}, true
 	default:
 		return agentSpec{}, false

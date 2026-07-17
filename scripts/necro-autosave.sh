@@ -42,9 +42,16 @@ if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then exit 0; fi
 LOCK_DIR="$SNAP_DIR/.autosave.lock"
 mkdir "$LOCK_DIR" 2>/dev/null || exit 0
 tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
-trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+# NOTE: no `trap ... EXIT` here. The real work runs in the backgrounded
+# subshell below, and this parent exits immediately — an EXIT trap on the
+# parent would drop the lock while the snapshot is still running, leaving the
+# work it is meant to serialize unprotected. The subshell owns the lock and
+# releases it via its own trap when the work is actually done.
 
 {
+  # The lock is held for the LIFETIME OF THIS SUBSHELL — the work, not just the
+  # setup above. Released on any exit path (success, error, kill).
+  trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
   echo "[$(necro_ts)] autosave started"
   "$SELF_DIR/necro-snapshot.sh" --idle-only 2>&1
 

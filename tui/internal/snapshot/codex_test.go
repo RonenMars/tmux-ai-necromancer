@@ -82,3 +82,34 @@ func TestLatestCodexSessionIDSinceFiltersStaleSession(t *testing.T) {
 		t.Fatalf("want %q (fresh), got %q", freshID, got2)
 	}
 }
+
+// Codex canonicalizes cwd to lowercase and macOS's filesystem is
+// case-insensitive, so a pane in .../tb-PRs-follow has its rollout recorded as
+// .../tb-prs-follow. EvalSymlinks resolves links but does NOT canonicalize
+// case, so an exact string compare misses the session entirely.
+// lib/agents/codex.sh case-folds for this reason; the TUI must match.
+func TestLatestCodexSessionIDMatchesCWDCaseInsensitively(t *testing.T) {
+	home := t.TempDir()
+	dir := filepath.Join(home, ".codex", "sessions", "2026", "07", "17")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+
+	id := "abcdabcd-1111-2222-3333-444444444444"
+	// Rollout records the lowercased cwd, as Codex writes it.
+	line := `{"type":"session_meta","payload":{"id":"` + id + `","cwd":"` +
+		filepath.Join(home, "work", "tb-prs-follow") + `"}}` + "\n"
+	f := filepath.Join(dir, "rollout-2026-07-17T00-00-00-"+id+".jsonl")
+	if err := os.WriteFile(f, []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// The pane's cwd carries the original mixed-case spelling.
+	got, err := LatestCodexSessionID(home, filepath.Join(home, "work", "tb-PRs-follow"), time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != id {
+		t.Errorf("LatestCodexSessionID with mixed-case cwd = %q, want %q", got, id)
+	}
+}

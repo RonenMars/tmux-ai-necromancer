@@ -161,17 +161,22 @@ while IFS= read -r line; do
   fi
 
   if [ -n "$agent" ] && [ -n "$uuid" ]; then
-    cur="$(tmux display-message -p -t "$window_id" '#{pane_current_command}' 2>/dev/null || echo '?')"
+    # Target the recorded PANE, not the window: `-t <window_id>` resolves to the
+    # window's ACTIVE pane, so in a multi-pane window the idle check and the
+    # resume can land on a different pane than the record describes (and every
+    # record for that window would target the same active pane). pane_id is
+    # stable across move-window, so it stays correct after the relocation above.
+    cur="$(tmux display-message -p -t "$pane_id" '#{pane_current_command}' 2>/dev/null || echo '?')"
     if necro_is_idle_shell "$cur"; then
       resume_cmd="$(necro_agent_resume_cmd "$agent" "$uuid")"
       if [ -n "$resume_cmd" ]; then
         echo "  $resume_cmd"
-        run tmux send-keys -t "$window_id" "$resume_cmd" Enter
+        run tmux send-keys -t "$pane_id" "$resume_cmd" Enter
         # Nudge the freshly-resumed agent to pick up its task. Wait first so the
         # message lands at the prompt, not on the agent's boot screen.
         if [ -n "$RESUME_MESSAGE" ]; then
           [ "$DRY_RUN" = "0" ] && sleep "$RESUME_MESSAGE_DELAY"
-          run tmux send-keys -t "$window_id" "$RESUME_MESSAGE" Enter
+          run tmux send-keys -t "$pane_id" "$RESUME_MESSAGE" Enter
         fi
         RESUME_BATCH_COUNT=$((RESUME_BATCH_COUNT + 1))
         if [ "$DRY_RUN" = "0" ] && [ "$((RESUME_BATCH_COUNT % RESUME_BATCH))" -eq 0 ]; then

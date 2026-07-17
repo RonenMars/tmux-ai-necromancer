@@ -21,14 +21,22 @@ CWD="$TMP/work"
 ARGV_UUID="aaaaaaaa-0000-0000-0000-000000000001"
 SCROLLBACK_UUID="bbbbbbbb-0000-0000-0000-000000000002"
 CURSOR_UUID="cccccccc-0000-0000-0000-000000000003"
-mkdir -p "$CWD" "$HOME/.claude/projects/${CWD//\//-}"
+# Resolve the transcript dir via the adapter — Claude encodes '/', '.' and '_'
+# all as '-', and a fixture that hardcodes only the '/' rule silently diverges
+# from the code under test (mktemp paths contain underscores).
+PROJ_DIR="$(
+  . "$ROOT/lib/common.sh"
+  . "$ROOT/lib/agents/claude.sh"
+  agent_claude_project_dir "$CWD"
+)"
+mkdir -p "$CWD" "$PROJ_DIR"
 # Only the cursor-pop candidate needs a real transcript file on disk. Its
 # mtime must be >= the pane's first-seen time (necro-watch.sh stamps that as
 # "now" when it first sees the pane) or the min_epoch filter — correctly —
 # rejects it as a stale transcript; that behavior has its own dedicated test
 # (necro-agent-min-epoch-filter-test.sh), so backdate first-seen instead of
 # fighting the filter here.
-printf '{"type":"user","message":{"content":"hi"}}\n' > "$HOME/.claude/projects/${CWD//\//-}/$CURSOR_UUID.jsonl"
+printf '{"type":"user","message":{"content":"hi"}}\n' > "$PROJ_DIR/$CURSOR_UUID.jsonl"
 
 # State file the stub tmux uses to report pane options across calls within one
 # necro-watch.sh invocation (real tmux persists these server-side).

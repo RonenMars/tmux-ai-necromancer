@@ -30,10 +30,34 @@ necro_init_log "$0"
 necro_load_agents
 
 # Self-throttle: run at most once per second regardless of status-interval.
+# Read-then-set is a TOCTOU: every attached client evaluates status-right, so
+# two watchers can both pass this check before either writes the option. Two
+# concurrent walks race the cursor files (double-popping UUIDs) and the pane
+# option writes. Same hazard, and same fix, as the autosave lock (invariant 7).
 LAST_WATCH_OPT="@necromancer_last_watch"
 now="$(date +%s)"
 last="$(necro_tmux_option "$LAST_WATCH_OPT" 0)"
 [ "$(( now - last ))" -lt 1 ] && exit 0
+
+# mkdir is the only POSIX-atomic primitive available here. Unlike autosave,
+# this script does its work in the foreground, so a plain EXIT trap correctly
+# holds the lock for the whole walk.
+#
+# Break a stale lock first: if a watcher is SIGKILLed its trap never runs, and
+# a permanently-held lock would silently stop all UUID pinning — the plugin's
+# core job — with no error anywhere. A tick is sub-second, so a lock older than
+# 60s cannot be a live run.
+WATCH_LOCK="$(necro_snapshot_dir)/.watch.lock"
+mkdir -p "$(dirname "$WATCH_LOCK")" 2>/dev/null || true
+if [ -d "$WATCH_LOCK" ]; then
+  lock_mtime="$(stat -f %m "$WATCH_LOCK" 2>/dev/null || stat -c %Y "$WATCH_LOCK" 2>/dev/null)"
+  if [ -n "$lock_mtime" ] && [ "$(( now - lock_mtime ))" -gt 60 ]; then
+    rmdir "$WATCH_LOCK" 2>/dev/null || true
+  fi
+fi
+mkdir "$WATCH_LOCK" 2>/dev/null || exit 0
+trap 'rmdir "$WATCH_LOCK" 2>/dev/null' EXIT
+
 tmux set-option -gq "$LAST_WATCH_OPT" "$now"
 
 # Persistent cursor dir (survives across ticks).

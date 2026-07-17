@@ -14,8 +14,40 @@ SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 necro_init_log "$0"
 
 SNAP_DIR="$(necro_snapshot_dir)"
+POINTER="$SNAP_DIR/latest-for-reboot"
 
 # ── helpers ──────────────────────────────────────────────────────────────────
+
+# Fully-resolved path of the snapshot pinned as the reboot target ("" if none).
+# Resolve BOTH sides before comparing: on macOS `readlink -f` reports
+# /private/var/... while `ls` yields /var/... for the same file, so a raw
+# string compare silently fails to recognize the pin.
+resolve_path() {
+  [ -n "${1:-}" ] || return 0
+  readlink -f "$1" 2>/dev/null || python3 -c 'import os,sys; print(os.path.realpath(sys.argv[1]))' "$1" 2>/dev/null || printf '%s' "$1"
+}
+
+pinned_snapshot() {
+  [ -e "$POINTER" ] || return 0
+  resolve_path "$POINTER"
+}
+
+# Drop the pinned reboot snapshot from a newline-separated delete list.
+# Autosave rotation already refuses to rotate it away; the menu's cleanup must
+# honor the same pin or a later reboot-resume finds a dangling pointer.
+filter_pinned() {
+  local pinned; pinned="$(pinned_snapshot)"
+  if [ -z "$pinned" ]; then cat; return; fi
+  local f
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
+    if [ "$(resolve_path "$f")" = "$pinned" ]; then
+      necro_warn "keeping pinned reboot snapshot: $(basename "$f")"
+      continue
+    fi
+    printf '%s\n' "$f"
+  done
+}
 
 list_snapshots() {
   /bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null
@@ -170,7 +202,7 @@ action_cleanup_backups() {
       read -r keep
       [[ "$keep" =~ ^[0-9]+$ ]] || { necro_warn "Invalid number."; return; }
       local to_delete
-      to_delete="$(echo "$snaps" | tail -n "+$(( keep + 1 ))")"
+      to_delete="$(echo "$snaps" | tail -n "+$(( keep + 1 ))" | filter_pinned)"
       if [ -z "$to_delete" ]; then
         echo "  Nothing to delete (have $total, keeping $keep)."; return
       fi
@@ -198,7 +230,7 @@ action_cleanup_backups() {
         local mtime
         mtime="$(stat -f '%m' "$f" 2>/dev/null || stat -c '%Y' "$f" 2>/dev/null)"
         [ -n "$mtime" ] && [ "$mtime" -lt "$cutoff" ] && to_delete+=("$f")
-      done <<< "$snaps"
+      done <<< "$(echo "$snaps" | filter_pinned)"
       if [ "${#to_delete[@]}" -eq 0 ]; then
         echo "  No snapshots older than $days days."; return
       fi
@@ -217,7 +249,7 @@ action_cleanup_backups() {
       local newest
       newest="$(echo "$snaps" | head -1)"
       local to_delete
-      to_delete="$(echo "$snaps" | tail -n +2)"
+      to_delete="$(echo "$snaps" | tail -n +2 | filter_pinned)"
       if [ -z "$to_delete" ]; then
         echo "  Only one snapshot exists — nothing to delete."; return
       fi

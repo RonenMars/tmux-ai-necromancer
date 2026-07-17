@@ -89,9 +89,18 @@ necro_hr
 TARGET="$SNAPSHOT_FILE"
 if (( ENRICH )) && [ "$DRY_RUN" = "0" ]; then
   necro_say "Phase 2: necro-context.sh"
-  "$SELF_DIR/necro-context.sh" "$SNAPSHOT_FILE" || true
   enriched="${SNAPSHOT_FILE%.jsonl}.enriched.jsonl"
-  [ -f "$enriched" ] && { TARGET="$enriched"; necro_ok "Enriched: $enriched"; }
+  # Only pin the enriched file when enrichment actually succeeded AND it holds
+  # at least as many records as the source. Enrichment is a nice-to-have; the
+  # raw snapshot restores fine without it, so fall back rather than risk
+  # pinning a short file as the reboot target.
+  if "$SELF_DIR/necro-context.sh" "$SNAPSHOT_FILE" && [ -f "$enriched" ] \
+     && [ "$(grep -cve '^[[:space:]]*$' "$enriched" 2>/dev/null || echo 0)" \
+          -ge "$(grep -cve '^[[:space:]]*$' "$SNAPSHOT_FILE" 2>/dev/null || echo 0)" ]; then
+    TARGET="$enriched"; necro_ok "Enriched: $enriched"
+  else
+    necro_warn "Enrichment failed or incomplete — pinning raw snapshot instead."
+  fi
   necro_hr
 fi
 

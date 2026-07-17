@@ -91,15 +91,19 @@ wait_for_shell() {
   printf '%s' "$cmd"; return 1
 }
 
-# Resolve a session id for a live/skipped pane.
-# For live agents uses pop (advances cursor so duplicate cwds get different UUIDs).
+# Resolve a session id for a pane via the filesystem fallback.
+#
+# Always pop, never "latest": pop hands out each id at most once per run, so
+# two agents sharing a cwd get different UUIDs. `latest` returns the same
+# newest id to every caller, so a second same-cwd pane would be recorded
+# pointing at the first pane's session — and restore would then resume one
+# conversation twice while losing the other entirely.
+#
+# The cursor dir is per-run here (mktemp'd in Main), so the first caller for a
+# cwd still gets the newest id, exactly as `latest` did.
 resolve_fallback_id() {
-  local agent="$1" cwd="$2" live="${3:-0}"
-  if [ "$live" = "1" ]; then
-    necro_agent_pop_session_id "$agent" "$cwd" 2>/dev/null || true
-  else
-    necro_agent_latest_session_id "$agent" "$cwd" 2>/dev/null || true
-  fi
+  local agent="$1" cwd="$2"
+  necro_agent_pop_session_id "$agent" "$cwd" 2>/dev/null || true
 }
 
 # --- Main -------------------------------------------------------------------
@@ -151,7 +155,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout; do
     fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
     fb_source="pane-option"
     if [ -z "$fb" ]; then
-      fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
+      fb="$(resolve_fallback_id "$agent" "$cwd")"
       fb_source="latest-jsonl"
     fi
     if [ -n "$fb" ]; then
@@ -177,7 +181,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout; do
   case "$ans" in
     q|Q) echo "  aborted by user"; break ;;
     s|S|n|N)
-      fb="$(resolve_fallback_id "$agent" "$cwd" 1)"
+      fb="$(resolve_fallback_id "$agent" "$cwd")"
       if [ -n "$fb" ]; then
         echo "  skipped — fallback id: $fb"
         emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl" "$layout"
