@@ -109,5 +109,11 @@ func codexMetaForCWD(path, cwd string) (string, bool) {
 	}
 	// Normalize both paths before comparing so that symlink spellings
 	// (e.g. /var vs /private/var on macOS) match correctly.
-	return id, id != "" && normPath(gotCWD) == normPath(cwd)
+	//
+	// Compare case-folded as well: Codex canonicalizes cwd to lowercase and
+	// macOS's filesystem is case-insensitive, so tb-PRs-follow and
+	// tb-prs-follow are the same directory. EvalSymlinks resolves links but
+	// does NOT canonicalize case, so without this a real session is missed.
+	// (lib/agents/codex.sh does the same case-fold — keep them in sync.)
+	return id, id != "" && strings.EqualFold(normPath(gotCWD), normPath(cwd))
 }

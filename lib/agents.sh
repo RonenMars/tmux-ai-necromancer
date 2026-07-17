@@ -42,7 +42,7 @@ necro_agent_for_cmd() {
 }
 
 # --- Per-cwd UUID cursor ----------------------------------------------------
-# File-based cursor so the index survives subshell boundaries (command substitution
+# File-based cursor so state survives subshell boundaries (command substitution
 # forks a subshell; writes to an in-memory array would be lost on return).
 # Cursor files live in $NECRO_CURSOR_DIR (set by the snapshot script before sourcing).
 # Usage: necro_agent_pop_session_id "$agent" "$cwd" ["$min_epoch"] — prints
@@ -50,6 +50,13 @@ necro_agent_for_cmd() {
 # transcripts created at or after that time (see agent_<name>_all_session_ids)
 # so a stale/unrelated session from days ago can't be handed to a pane that
 # didn't exist yet when it was written.
+#
+# The cursor records WHICH ids were handed out, not HOW MANY. A positional
+# index breaks against the watcher's persistent cursor dir, because the
+# newest-first listing changes between ticks: idx=1 into a shrunk 1-entry list
+# reads as "exhausted" (a fresh session never gets pinned), and idx=1 into
+# [new, old] re-hands the old id that is already pinned to another pane.
+# Storing ids makes the pop idempotent under any reordering of the listing.
 necro_agent_pop_session_id() {
   local agent="$1" cwd="$2" min_epoch="${3:-}"
   declare -f "agent_${agent}_all_session_ids" >/dev/null 2>&1 || return 0
@@ -59,17 +66,17 @@ necro_agent_pop_session_id() {
   # Safe filename: replace non-alnum with _.
   local key; key="$(printf '%s:%s' "$agent" "$cwd" | tr -cs 'a-zA-Z0-9' '_')"
   local cursor_file="$cursor_dir/$key"
-  local idx=0
-  [ -f "$cursor_file" ] && idx="$(cat "$cursor_file" 2>/dev/null || echo 0)"
-  local ids=()
+  local id
   while IFS= read -r id; do
-    [ -n "$id" ] && ids+=("$id")
+    [ -n "$id" ] || continue
+    if [ -f "$cursor_file" ] && grep -qxF "$id" "$cursor_file" 2>/dev/null; then
+      continue  # already handed out
+    fi
+    printf '%s' "$id"
+    printf '%s\n' "$id" >> "$cursor_file" 2>/dev/null
+    return 0
   done < <("agent_${agent}_all_session_ids" "$cwd" "$min_epoch" 2>/dev/null)
-  if [ "${#ids[@]}" -eq 0 ] || [ "$idx" -ge "${#ids[@]}" ]; then
-    return 0  # exhausted
-  fi
-  printf '%s' "${ids[$idx]}"
-  printf '%d' $(( idx + 1 )) > "$cursor_file"
+  return 0  # exhausted — every candidate already pinned
 }
 
 # --- Dispatch wrappers ------------------------------------------------------

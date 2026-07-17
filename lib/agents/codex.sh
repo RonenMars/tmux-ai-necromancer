@@ -31,12 +31,22 @@ agent_codex_latest_session_id() {
 }
 
 # All session ids for a cwd, newest-first, one per line.
+#
+# Optional 2nd arg: min_epoch. When given, a rollout is only a candidate if its
+# mtime is >= min_epoch — a transcript last written before the pane existed
+# can't be that pane's session. Mirrors agent_claude_all_session_ids; without
+# it the cursor-pop fallback (codex's only resolution path when argv has no
+# `resume <uuid>`) can pin a session from days ago to a fresh pane.
 agent_codex_all_session_ids() {
-  local cwd="$1"
+  local cwd="$1" min_epoch="${2:-}"
   [ -d "$CODEX_SESSIONS_DIR" ] || return 0
-  local f
+  local f mtime
   while IFS= read -r f; do
     [ -n "$f" ] || continue
+    if [ -n "$min_epoch" ]; then
+      mtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)"
+      [ -n "$mtime" ] && [ "$mtime" -lt "$min_epoch" ] && continue
+    fi
     local id
     id="$(head -1 "$f" 2>/dev/null | python3 -c '
 import sys, json
@@ -59,6 +69,21 @@ EOF
 # Codex doesn't print a resume farewell line reliably; no scrollback scrape.
 agent_codex_scrape_session_id() {
   return 0
+}
+
+# Ground-truth UUID from the running process argv (invariant 9: argv beats
+# scrollback beats cursor-pop). Codex resumes via the SUBCOMMAND form
+# `codex resume [OPTIONS] <SESSION_ID>` — no `--resume` flag — so match a
+# positional UUID after the `resume` verb. Returns "" for a fresh session.
+agent_codex_scrape_ps_resume() {
+  local pane="$1" pane_pid child
+  pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"
+  [ -n "$pane_pid" ] || return 0
+  for child in $(pgrep -P "$pane_pid" 2>/dev/null); do
+    ps -o command= -p "$child" 2>/dev/null
+  done | grep -oE -- "resume([[:space:]]+-[^[:space:]]+)*[[:space:]]+$CODEX_UUID_RE" \
+    | grep -oE "$CODEX_UUID_RE" \
+    | head -1
 }
 
 # Shell command that resumes a given session id.

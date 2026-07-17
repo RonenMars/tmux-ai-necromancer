@@ -105,3 +105,29 @@ func TestTruncatePreservesUTF8(t *testing.T) {
 		t.Fatalf("want valid UTF-8, got %q", got)
 	}
 }
+
+// tmux reports the native binary's truncated basename (e.g. "codex-aarch64-a"
+// for codex-aarch64-apple-darwin), not the "codex" wrapper. lib/agents/codex.sh
+// matches `codex|codex-*`; the TUI must agree or it silently treats a real
+// Codex pane as "not a supported agent".
+func TestAgentForCommandMatchesTruncatedCodexBinary(t *testing.T) {
+	for _, tc := range []struct {
+		cmd      string
+		wantName string
+		wantOK   bool
+	}{
+		{"claude", "claude", true},
+		{"codex", "codex", true},
+		{"codex-aarch64-a", "codex", true},
+		{"codex-aarch64-apple-darwin", "codex", true},
+		{"zsh", "", false},
+		{"node", "", false},
+		{"codexify", "", false}, // not a codex binary: no '-' separator
+	} {
+		got, ok := agentForCommand(tc.cmd)
+		if ok != tc.wantOK || got.name != tc.wantName {
+			t.Errorf("agentForCommand(%q) = (%q, %v), want (%q, %v)",
+				tc.cmd, got.name, ok, tc.wantName, tc.wantOK)
+		}
+	}
+}

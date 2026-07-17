@@ -140,3 +140,32 @@ func TestAppendRecord_RoundTrip(t *testing.T) {
 		t.Fatalf("unexpected records: %+v", recs)
 	}
 }
+
+// LoadLatest picks the most recently modified snapshot, which may be an
+// autosave that is still being written — its trailing line is then a partial
+// record. necro-restore.sh skips malformed records; the TUI must too, or one
+// bad line blanks the whole viewer.
+func TestLoadFileSkipsMalformedLines(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "snap.jsonl")
+
+	good1 := `{"pane_id":"%1","session":"a","window_index":0,"cwd":"/tmp","agent":"claude","uuid":"u1"}`
+	good2 := `{"pane_id":"%2","session":"b","window_index":1,"cwd":"/tmp","agent":"codex","uuid":"u2"}`
+	partial := `{"pane_id":"%3","session":"c","cw` // truncated mid-write
+
+	content := good1 + "\n" + partial + "\n" + good2 + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	recs, err := snapshot.LoadFile(path)
+	if err != nil {
+		t.Fatalf("LoadFile returned error for a snapshot with one bad line: %v", err)
+	}
+	if len(recs) != 2 {
+		t.Fatalf("got %d records, want 2 (both good lines, bad line skipped)", len(recs))
+	}
+	if recs[0].PaneID != "%1" || recs[1].PaneID != "%2" {
+		t.Errorf("got panes %q/%q, want %%1/%%2", recs[0].PaneID, recs[1].PaneID)
+	}
+}

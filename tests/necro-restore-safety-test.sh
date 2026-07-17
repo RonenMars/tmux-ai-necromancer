@@ -36,8 +36,17 @@ CODEX_CWD="$TMP/codex"
 UNSAFE_CWD="/private/tmp/claude-501/work/scratchpad/tmux-debug-build/tmux/crashtest"
 mkdir -p "$SMALL_CWD" "$LARGE_CWD" "$CODEX_CWD"
 
-small_dir="$HOME/.claude/projects/${SMALL_CWD//\//-}"
-large_dir="$HOME/.claude/projects/${LARGE_CWD//\//-}"
+# Resolve via the adapter — Claude encodes '/', '.' and '_' all as '-', so a
+# fixture hardcoding only the '/' rule diverges from the code under test.
+proj_dir_for() {
+  (
+    . "$ROOT/lib/common.sh"
+    . "$ROOT/lib/agents/claude.sh"
+    agent_claude_project_dir "$1"
+  )
+}
+small_dir="$(proj_dir_for "$SMALL_CWD")"
+large_dir="$(proj_dir_for "$LARGE_CWD")"
 mkdir -p "$small_dir" "$large_dir"
 printf 'small\n' > "$small_dir/$SMALL_UUID.jsonl"
 printf 'this transcript is intentionally large\n' > "$large_dir/$LARGE_UUID.jsonl"

@@ -85,8 +85,16 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
 7. **Autosave uses an atomic `mkdir` lock** (`$SNAP_DIR/.autosave.lock`). Two
    concurrent status-right evaluations can both pass the timestamp throttle
    before either writes the new `@necromancer_last_saved` value (TOCTOU).
-   `mkdir` is the only POSIX-safe atomic primitive here; `trap ... EXIT` cleans
-   up on any exit path.
+   `mkdir` is the only POSIX-safe atomic primitive here.
+
+   **The `trap ... EXIT` MUST live inside the backgrounded `{ ... } &` work
+   subshell, not in the parent.** The parent returns immediately (status-right
+   must never block), so a parent-level trap releases the lock within
+   milliseconds while the snapshot is still running — measured at 17ms of
+   protection for 3000ms of work, i.e. the lock guarded setup and nothing else.
+   `necro-watch.sh` works in the FOREGROUND, so a plain top-level trap is
+   correct there; it also breaks a >60s-old lock, since a SIGKILLed watcher
+   would otherwise wedge UUID pinning forever with no error anywhere.
 
 8. **Prune keys on child processes, not agent match, and operates per-window.**
    `necro-prune.sh` kills a window only when *every* pane's process has no child
@@ -122,6 +130,26 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     remove the pacing to "simplify" the loop — the stall it prevents is real
     and reproducible, not tests-passing.
 
+11. **Claude encodes `/`, `.` AND `_` as `-`** in `~/.claude/projects/<cwd>`.
+    Encoding only `/` (the obvious rule) silently mis-resolves any cwd with a
+    dot or underscore — a `.worktrees/` checkout, a `/var/folders/..._...`
+    tmpdir — and every filesystem lookup then finds nothing: no fallback id, no
+    cursor-pop candidate, and the transcript-size guard reports "unknown or
+    missing", waving oversized transcripts through. Verified against every
+    project dir on disk: slash-only matched 65/148, slash+dot+underscore
+    148/148. Tests must call `agent_claude_project_dir` rather than
+    re-implementing the rule — a fixture that hardcodes `${cwd//\//-}` diverges
+    from the code and hides exactly this bug.
+
+12. **The cursor pop records WHICH ids it handed out, not HOW MANY.** The
+    watcher's cursor dir is persistent, and the newest-first listing changes
+    between ticks, so a positional index silently breaks: `idx=1` into a list
+    that shrank back to one entry reads as "exhausted" (a fresh session never
+    gets pinned), and `idx=1` into `[new, old]` re-hands `old`, which is
+    already pinned to another pane. Cursor-pop is the NORMAL path for fresh
+    sessions (no `--resume` in argv, nothing in scrollback), so this is not an
+    edge case.
+
 ## Testing
 
 Self-contained bash tests live in `tests/`. Each uses `mktemp -d` + `NECROMANCER_SNAPSHOT_DIR`
@@ -129,8 +157,16 @@ for full isolation — no live tmux server required. Run any test directly:
 
 ```bash
 bash tests/necro-autosave-lock-test.sh   # lock: only one concurrent autosave fires
+bash tests/necro-autosave-lock-lifetime-test.sh  # lock is held for the WORK, not just setup
+bash tests/necro-watch-lock-test.sh      # watcher lock: no concurrent walks; stale lock self-heals
 bash tests/necro-context-codex-test.sh   # context enrichment for Codex sessions
 bash tests/necro-prune-idle-window-test.sh  # prune kills idle windows, keeps busy ones
+bash tests/necro-agent-claude-project-dir-test.sh # Claude's cwd encoding ('/', '.', '_' -> '-')
+bash tests/necro-agent-pop-cursor-test.sh # cursor pop tracks WHICH ids were used, not how many
+bash tests/necro-agent-codex-min-epoch-test.sh    # codex honors the stale-transcript filter too
+bash tests/necro-agent-codex-scrape-ps-resume-test.sh  # codex argv ground truth (subcommand form)
+bash tests/necro-menu-cleanup-pin-test.sh # menu cleanup never deletes the pinned reboot snapshot
+bash tests/necro-restore-claim-group-test.sh # claimed windows group later records (no flattening)
 bash tests/necro-agent-scrape-ps-resume-test.sh   # ps-argv is ground truth for pane UUID pinning
 bash tests/necro-agent-scrape-ps-resume-multichild-test.sh  # finds claude among sibling processes
 bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts

@@ -23,11 +23,18 @@ CWD="$TMP/work"
 UUID_SKIP="00000000-0000-0000-0000-000000000000"
 UUID1="11111111-1111-1111-1111-111111111111"
 UUID2="22222222-2222-2222-2222-222222222222"
-mkdir -p "$CWD" "$HOME/.claude/projects/${CWD//\//-}"
+# Resolve via the adapter — Claude encodes '/', '.' and '_' all as '-', so a
+# fixture hardcoding only the '/' rule diverges from the code under test.
+PROJ_DIR="$(
+  . "$ROOT/lib/common.sh"
+  . "$ROOT/lib/agents/claude.sh"
+  agent_claude_project_dir "$CWD"
+)"
+mkdir -p "$CWD" "$PROJ_DIR"
 # This one is deliberately oversized relative to the tiny max-bytes below.
-printf '%1000s\n' | tr ' ' 'x' > "$HOME/.claude/projects/${CWD//\//-}/$UUID_SKIP.jsonl"
-printf 'transcript\n' > "$HOME/.claude/projects/${CWD//\//-}/$UUID1.jsonl"
-printf 'transcript\n' > "$HOME/.claude/projects/${CWD//\//-}/$UUID2.jsonl"
+printf '%1000s\n' | tr ' ' 'x' > "$PROJ_DIR/$UUID_SKIP.jsonl"
+printf 'transcript\n' > "$PROJ_DIR/$UUID1.jsonl"
+printf 'transcript\n' > "$PROJ_DIR/$UUID2.jsonl"
 
 cat > "$TMPBIN/tmux" <<'EOF'
 #!/usr/bin/env bash
@@ -62,8 +69,13 @@ EOF
 # batch size 2: the skip should NOT count toward the batch. With 2 real
 # resumes (UUID1, UUID2) and batch size 2, they land in the same batch — a
 # single pause, not two, and NOT triggered by the skip record beforehand.
+#
+# RESUME_DELAY is 6s (not ~2s) so that one pause dominates the fixture's own
+# overhead: the pass/fail signal is "1 pause vs 2", and a delay close to the
+# script's baseline runtime makes those two cases indistinguishable.
+RESUME_DELAY=6
 start="$(date +%s)"
-out="$(NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES=100 NECROMANCER_RESUME_DELAY=2 NECROMANCER_RESUME_BATCH_SIZE=2 \
+out="$(NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES=100 NECROMANCER_RESUME_DELAY="$RESUME_DELAY" NECROMANCER_RESUME_BATCH_SIZE=2 \
   bash "$ROOT/scripts/necro-restore.sh" "$SNAP" 2>&1)"
 elapsed=$(( $(date +%s) - start ))
 
@@ -79,12 +91,13 @@ grep -F "agents resumed: 2, resume skipped: 1" <<<"$out" >/dev/null || {
   exit 1
 }
 
-# 2 real resumes at batch size 2 → exactly 1 pause (~2s), not 2 (~4s+), and
-# the skip (processed first in the snapshot) must not have added a phantom
-# pause before them.
-[ "$elapsed" -ge 2 ] && [ "$elapsed" -lt 4 ] || {
-  echo "FAIL: took ${elapsed}s — expected ~2s (1 pause for 2 real resumes, skip doesn't count)" >&2
+# 2 real resumes at batch size 2 → exactly 1 pause, not 2. Bound the upper end
+# below 2 pauses rather than tight against 1: the script's own fixture/stub
+# overhead rides on top of the sleeps, so assert the pause COUNT, not a precise
+# runtime. A phantom pause from the skip would push this to >= 2 * RESUME_DELAY.
+[ "$elapsed" -ge "$RESUME_DELAY" ] && [ "$elapsed" -lt $(( RESUME_DELAY * 2 )) ] || {
+  echo "FAIL: took ${elapsed}s — expected one ${RESUME_DELAY}s pause (2 real resumes, batch 2; skip must not pause)" >&2
   echo "$out" >&2
   exit 1
 }
-echo "PASS: skipped (oversized) record doesn't consume a batch slot or trigger a pause (${elapsed}s)"
+echo "PASS: skipped (oversized) record doesn't consume a batch slot or trigger a pause (${elapsed}s, one ${RESUME_DELAY}s pause)"

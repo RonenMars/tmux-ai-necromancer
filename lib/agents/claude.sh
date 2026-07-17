@@ -22,9 +22,16 @@ agent_claude_matches() {
 }
 
 # Per-project transcript directory for a cwd ("" if none).
+# Claude encodes '/', '.' and '_' all as '-' (verified against every project
+# dir on disk). Encoding only '/' misses any cwd with a dot or underscore —
+# e.g. a `.worktrees/` checkout — and the lookup silently finds nothing.
 agent_claude_project_dir() {
   local cwd="$1"
-  printf '%s' "$HOME/.claude/projects/${cwd//\//-}"
+  local enc="$cwd"
+  enc="${enc//\//-}"
+  enc="${enc//./-}"
+  enc="${enc//_/-}"
+  printf '%s' "$HOME/.claude/projects/$enc"
 }
 
 agent_claude_transcript_path() {
@@ -60,14 +67,20 @@ agent_claude_all_session_ids() {
   local cwd="$1" min_epoch="${2:-}" proj_dir f mtime
   proj_dir="$(agent_claude_project_dir "$cwd")"
   [ -d "$proj_dir" ] || return 0
-  for f in $(/bin/ls -t "$proj_dir"/*.jsonl 2>/dev/null); do
+  # Read the listing line-by-line: `for f in $(ls ...)` word-splits on spaces,
+  # so a cwd containing a space yields a project dir whose files are chopped
+  # into fragments and the lookup silently returns nothing.
+  while IFS= read -r f; do
+    [ -n "$f" ] || continue
     if [ -n "$min_epoch" ]; then
       mtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)"
       [ -n "$mtime" ] && [ "$mtime" -lt "$min_epoch" ] && continue
     fi
     head -c 400 "$f" 2>/dev/null | grep -q '<teammate-message' && continue
     basename "$f" | sed -nE "s/^($CLAUDE_UUID_RE)\.jsonl\$/\\1/p"
-  done
+  done <<EOF
+$(/bin/ls -t "$proj_dir"/*.jsonl 2>/dev/null)
+EOF
 }
 
 # Scrape a session id from pane scrollback near a "resume" marker ("" if none).

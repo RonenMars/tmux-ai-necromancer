@@ -5,7 +5,6 @@ package snapshot
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -51,7 +50,12 @@ func LoadFile(path string) ([]Record, error) {
 		}
 		var r Record
 		if err := json.Unmarshal([]byte(line), &r); err != nil {
-			return nil, fmt.Errorf("%s: %w", path, err)
+			// Skip the bad line rather than failing the whole snapshot:
+			// necro-restore.sh tolerates malformed records, and LoadLatest
+			// may well pick an autosave that is still being written, whose
+			// trailing line is a partial record. Aborting here would blank
+			// the viewer over one unparseable line out of hundreds.
+			continue
 		}
 		recs = append(recs, r)
 	}

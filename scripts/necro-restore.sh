@@ -396,6 +396,16 @@ while IFS= read -r line; do
     echo "  existing pane matches snapshot — claiming marker"
     pane_target="$claim_id"
     [ "$DRY_RUN" = "1" ] || tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
+    # Register the claimed pane's window for this group, exactly as the
+    # create paths do. Without this, a later record in the same
+    # (session, window_index) finds no WIN_FOR_GROUP entry and falls through
+    # to `new-window` — flattening a multi-pane window into separate windows
+    # (the invariant-2 regression) and skipping the layout replay, which
+    # requires WIN_FOR_GROUP to be set.
+    if [ "$DRY_RUN" = "0" ] && [ -z "${WIN_FOR_GROUP[$group]:-}" ]; then
+      claimed_win="$(tmux display-message -p -t "$pane_target" '#{window_id}' 2>/dev/null || true)"
+      [ -n "$claimed_win" ] && WIN_FOR_GROUP[$group]="$claimed_win"
+    fi
     reused=$((reused + 1))
     cur_cmd="$(window_current_command "$pane_target")"
     if necro_is_idle_shell "$cur_cmd"; then

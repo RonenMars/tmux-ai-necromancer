@@ -23,9 +23,16 @@ mkdir -p "$TMPBIN"
 CWD="$TMP/work"
 UUID1="11111111-1111-1111-1111-111111111111"
 UUID2="22222222-2222-2222-2222-222222222222"
-mkdir -p "$CWD" "$HOME/.claude/projects/${CWD//\//-}"
-printf 'transcript\n' > "$HOME/.claude/projects/${CWD//\//-}/$UUID1.jsonl"
-printf 'transcript\n' > "$HOME/.claude/projects/${CWD//\//-}/$UUID2.jsonl"
+# Resolve via the adapter — Claude encodes '/', '.' and '_' all as '-', so a
+# fixture hardcoding only the '/' rule diverges from the code under test.
+PROJ_DIR="$(
+  . "$ROOT/lib/common.sh"
+  . "$ROOT/lib/agents/claude.sh"
+  agent_claude_project_dir "$CWD"
+)"
+mkdir -p "$CWD" "$PROJ_DIR"
+printf 'transcript\n' > "$PROJ_DIR/$UUID1.jsonl"
+printf 'transcript\n' > "$PROJ_DIR/$UUID2.jsonl"
 
 # Stub tmux: session/window always "fresh" so both records reach resume.
 # session_fresh path is taken when has-session fails on first check and the
@@ -92,21 +99,26 @@ echo "PASS: NECROMANCER_RESUME_DELAY=0 skips the wait"
 
 # Batch size 2: both resumes launch in the same batch, so only 1 pause total
 # instead of 2 — proves batching actually reduces pause count, not just delay=0.
+#
+# The delay is 6s so a single pause dominates the script's own runtime: the
+# signal here is "1 pause vs 2", and a delay near the baseline makes those two
+# indistinguishable (fixture + stub overhead rides on top of the sleeps).
+BATCH_DELAY=6
 start="$(date +%s)"
-out="$(NECROMANCER_RESUME_DELAY=2 NECROMANCER_RESUME_BATCH_SIZE=2 bash "$ROOT/scripts/necro-restore.sh" "$SNAP" 2>&1)"
+out="$(NECROMANCER_RESUME_DELAY="$BATCH_DELAY" NECROMANCER_RESUME_BATCH_SIZE=2 bash "$ROOT/scripts/necro-restore.sh" "$SNAP" 2>&1)"
 elapsed=$(( $(date +%s) - start ))
 
-grep -F "Resume pacing: 2s pause every 2 resume(s)" <<<"$out" >/dev/null || {
+grep -F "Resume pacing: ${BATCH_DELAY}s pause every 2 resume(s)" <<<"$out" >/dev/null || {
   echo "FAIL: batch-size setting not reported in output" >&2
   echo "$out" >&2
   exit 1
 }
-[ "$elapsed" -ge 2 ] && [ "$elapsed" -lt 4 ] || {
-  echo "FAIL: batch size 2 took ${elapsed}s — expected ~2s (1 pause for 2 records), not 4s+" >&2
+[ "$elapsed" -ge "$BATCH_DELAY" ] && [ "$elapsed" -lt $(( BATCH_DELAY * 2 )) ] || {
+  echo "FAIL: batch size 2 took ${elapsed}s — expected one ${BATCH_DELAY}s pause for 2 records, not two" >&2
   echo "$out" >&2
   exit 1
 }
-echo "PASS: batch size 2 pauses once for 2 records (${elapsed}s, not 4s+)"
+echo "PASS: batch size 2 pauses once for 2 records (${elapsed}s, one ${BATCH_DELAY}s pause)"
 
 # --resume-delay / --resume-batch-size CLI flags override env/tmux-option.
 out="$(bash "$ROOT/scripts/necro-restore.sh" --resume-delay 0 --resume-batch-size 5 "$SNAP" 2>&1)"
