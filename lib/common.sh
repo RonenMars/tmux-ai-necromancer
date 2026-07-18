@@ -4,8 +4,8 @@
 # Sourced, never executed. Provides:
 #   - PLUGIN_ROOT resolution (path-agnostic; works wherever the repo is cloned)
 #   - snapshot dir resolution (honors @necromancer_snapshot_dir / env / default)
-#   - log dir resolution (honors @necromancer_log_dir / env / default)
-#   - logging helpers
+#   - debug log resolution (honors @necromancer_log_dir / env / default)
+#   - opt-in debug tracing helpers
 #   - JSON string escaping
 #   - tmux option getters
 #
@@ -79,25 +79,62 @@ necro_log_dir() {
   printf '%s' "$HOME/.tmux-ai-necromancer-logs"
 }
 
-# Initialize per-script logging. Mirrors stdout/stderr to a log file in the
-# configured log dir while preserving interactive output.
+# --- Debug logging ----------------------------------------------------------
+# Precedence: explicit env var > tmux option > disabled. When enabled, every
+# command after initialization is traced to the script's log file.
+necro_debug_enabled() {
+  local value
+  if [ -n "${NECROMANCER_DEBUG+x}" ]; then
+    value="$NECROMANCER_DEBUG"
+  else
+    value="$(necro_tmux_option @necromancer_debug "off")"
+  fi
+  case "$value" in
+    1|on|true|yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Emit a machine-searchable lifecycle/action record. Callers should use stable
+# phase and action names and pass only key=value fields (never transcript or
+# scrollback contents).
+necro_log_event() {
+  [ -n "${NECRO_LOG_FILE:-}" ] || return 0
+  local phase="$1" action="$2"
+  shift 2
+  printf '[%s] event phase=%s action=%s' "$(necro_ts)" "$phase" "$action" >&3
+  local field
+  for field in "$@"; do
+    printf ' %s' "$field" >&3
+  done
+  printf '\n' >&3
+}
+
+# Initialize opt-in per-script structured logging. Stdout and stderr remain
+# untouched; callers emit lifecycle and action events via necro_log_event.
 necro_init_log() {
+  necro_debug_enabled || return 0
+
   local script="${1:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}}"
   local name log_dir
   name="$(basename "$script")"
   name="${name%.*}"
   log_dir="$(necro_log_dir)"
-  mkdir -p "$log_dir"
+  mkdir -p "$log_dir" || {
+    necro_warn "could not create debug log directory: $log_dir"
+    return 0
+  }
   NECRO_LOG_FILE="$log_dir/$name.log"
   export NECRO_LOG_FILE
-  exec > >(tee -a "$NECRO_LOG_FILE") 2>&1
+  exec 3>> "$NECRO_LOG_FILE"
+  necro_log_event "run" "start" "script=$name"
 }
 
 # --- Logging ----------------------------------------------------------------
-necro_say()  { printf '\033[1;36m▸\033[0m %s\n' "$*"; }
-necro_ok()   { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
-necro_warn() { printf '\033[1;33m⚠\033[0m %s\n' "$*" >&2; }
-necro_err()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; }
+necro_say()  { necro_log_event "message" "info" "text=$*"; printf '\033[1;36m▸\033[0m %s\n' "$*"; }
+necro_ok()   { necro_log_event "message" "success" "text=$*"; printf '\033[0;32m✓\033[0m %s\n' "$*"; }
+necro_warn() { necro_log_event "message" "warning" "text=$*"; printf '\033[1;33m⚠\033[0m %s\n' "$*" >&2; }
+necro_err()  { necro_log_event "message" "error" "text=$*"; printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; }
 necro_hr()   { printf '\n\033[2m─────────────────────────────────────────────\033[0m\n\n'; }
 
 # Timestamp for log lines.

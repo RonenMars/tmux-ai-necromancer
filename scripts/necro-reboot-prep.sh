@@ -57,6 +57,7 @@ tmux list-sessions >/dev/null 2>&1 || { necro_err "No tmux server running."; exi
 
 necro_hr
 necro_say "Necromancer reboot prep"
+necro_log_event "reboot_prep" "start" "mode=$MODE" "enrich=$ENRICH" "dry_run=$DRY_RUN"
 echo "  Mode:    $MODE"
 echo "  Enrich:  $ENRICH"
 echo "  Dry-run: $DRY_RUN"
@@ -121,3 +122,4 @@ else ln -sfn "$TARGET" "$POINTER" && necro_ok "Pointer: $POINTER → $(readlink 
 necro_hr
 
 necro_ok "Reboot prep complete. Now: sudo reboot → then necro-reboot-resume.sh"
+necro_log_event "reboot_prep" "complete" "snapshot=$SNAPSHOT"

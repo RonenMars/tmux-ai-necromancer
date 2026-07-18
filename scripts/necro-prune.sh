@@ -22,6 +22,7 @@ command -v tmux >/dev/null 2>&1 || { echo "tmux not found" >&2; exit 1; }
 
 dry_run=0
 [ "${1:-}" = "--dry-run" ] && dry_run=1 && echo "[dry-run] no windows will be killed"
+necro_log_event "prune" "start" "dry_run=$dry_run"
 
 [ -n "${TMUX:-}" ] && echo "Warning: running inside tmux — may kill this pane. Ctrl-C to abort." >&2
 
@@ -41,12 +42,15 @@ while read -r wid label; do
   [ -z "$wid" ] && continue
   case "$busy" in
     *" $wid "*)
+      necro_log_event "prune" "keep" "window=$wid" "reason=active"
       echo "  keeping active window: $label ($wid)"
       ;;
     *)
       if [ "$dry_run" -eq 1 ]; then
+        necro_log_event "prune" "would_kill" "window=$wid"
         echo "[dry-run] would kill idle window: $label ($wid)"
       else
+        necro_log_event "prune" "kill" "window=$wid"
         echo "Killing idle window: $label"
         tmux kill-window -t "$wid" 2>/dev/null || true
       fi

@@ -96,14 +96,19 @@ they are reused — no duplicates, no extra agents launched.
 - The tmux status indicator is `necro:<tracked>/<active>`; disable it with
   `set -g @necromancer_status 'off'` if you do not want the extra segment.
 
-## Script logs
+## Debug logs
 
-- Script logs now write to `~/.tmux-ai-necromancer-logs` by default; override
-  `@necromancer_log_dir` or `NECROMANCER_LOG_DIR` if you want a different
-  location.
-- Each executable script gets its own log file, so `necro-autosave.sh` logs to
-  `necro-autosave.log`, `necro-restore.sh` logs to `necro-restore.log`, and so
-  on.
+- Enable tracing with `set -g @necromancer_debug 'on'` (or
+  `NECROMANCER_DEBUG=1` for one command). Logs are off by default.
+- Each executable script then writes structured lifecycle and action events to
+  `~/.tmux-ai-necromancer-logs/<script>.log`; override the location with
+  `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`.
+- Shell logs include `event phase=<phase> action=<action>` records for major
+  lifecycle transitions and mutations. The TUI appends equivalent JSONL events
+  to `tui.log`, including its load, review, exit, tmux, and snapshot phases.
+  Neither logger records scrollback or transcript content.
+- Run `scripts/necro-clean-debug-logs.sh --dry-run` to preview cleanup, then
+  rerun without the flag to remove the debug logs.
 
 ---
 

@@ -92,6 +92,7 @@ prompt_choice() {
 # ── actions ──────────────────────────────────────────────────────────────────
 
 action_list_backups() {
+  necro_log_event "menu" "list_backups" "snapshot_dir=$SNAP_DIR"
   necro_hr
   necro_say "Existing snapshots"
   local snaps pointer="$SNAP_DIR/latest-for-reboot"
@@ -114,6 +115,7 @@ action_list_backups() {
 }
 
 action_resume_backup() {
+  necro_log_event "menu" "resume_backup" "snapshot_dir=$SNAP_DIR"
   necro_hr
   necro_say "Resume a specific snapshot"
   local snaps
@@ -176,6 +178,7 @@ action_resume_backup() {
 }
 
 action_cleanup_backups() {
+  necro_log_event "menu" "cleanup_backups" "snapshot_dir=$SNAP_DIR"
   necro_hr
   necro_say "Cleanup snapshots"
   local snaps
@@ -273,6 +276,7 @@ action_cleanup_backups() {
 }
 
 action_reboot_prep() {
+  necro_log_event "menu" "reboot_prep" "snapshot_dir=$SNAP_DIR"
   necro_hr
   necro_say "Reboot / shutdown prep"
   echo ""

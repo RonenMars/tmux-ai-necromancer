@@ -8,6 +8,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 # Isolated snapshot dir — no live tmux or real snapshot dir needed.
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
+export NECROMANCER_DEBUG=1
 mkdir -p "$NECROMANCER_SNAPSHOT_DIR"
 
 # Stub bin dir prepended to PATH.

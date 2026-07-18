@@ -57,6 +57,7 @@ mkdir -p "$SNAP_DIR"
 TS="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
 suffix=""; [ "$IDLE_ONLY" = "1" ] && suffix=".idle-only"
 OUT="$SNAP_DIR/${TS}${suffix}.jsonl"
+necro_log_event "snapshot" "start" "idle_only=$IDLE_ONLY" "assume_yes=$ASSUME_YES" "output=$OUT"
 
 # --- Record emitter ---------------------------------------------------------
 # uuid_source: "scrollback" | "latest-jsonl" | "" (none)
@@ -78,6 +79,7 @@ emit_record() {
     "$(necro_json_escape "$window_layout")" \
     "$(necro_json_escape "$now")" \
     >> "$OUT"
+  necro_log_event "snapshot" "record" "pane=$pane_id" "agent=${agent:-none}" "uuid_source=${uuid_source:-none}"
 }
 
 # Wait for a pane to drop back to an idle shell. Echoes the new command.
@@ -218,3 +220,4 @@ done <<<"$snapshot"
 echo
 echo "Snapshot written: $OUT"
 echo "Records: $(wc -l < "$OUT" | tr -d ' ')"
+necro_log_event "snapshot" "complete" "output=$OUT"

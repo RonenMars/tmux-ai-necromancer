@@ -19,9 +19,11 @@ necro_load_agents() {
   for name in $(necro_enabled_agents); do
     local f="$LIB_DIR/agents/${name}.sh"
     if [ -f "$f" ]; then
+      necro_log_event "agents" "load_adapter" "agent=$name"
       # shellcheck disable=SC1090
       . "$f"
     else
+      necro_log_event "agents" "missing_adapter" "agent=$name"
       necro_warn "agent adapter not found: $f (skipping '$name')"
     fi
   done
@@ -74,8 +76,10 @@ necro_agent_pop_session_id() {
     fi
     printf '%s' "$id"
     printf '%s\n' "$id" >> "$cursor_file" 2>/dev/null
+    necro_log_event "agents" "pop_session_id" "agent=$agent" "result=found"
     return 0
   done < <("agent_${agent}_all_session_ids" "$cwd" "$min_epoch" 2>/dev/null)
+  necro_log_event "agents" "pop_session_id" "agent=$agent" "result=exhausted"
   return 0  # exhausted — every candidate already pinned
 }
 

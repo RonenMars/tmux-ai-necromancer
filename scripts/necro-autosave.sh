@@ -27,20 +27,28 @@ mkdir -p "$SNAP_DIR"
 interval_minutes="$(necro_tmux_option @necromancer_interval 5)"
 max_snapshots="$(necro_tmux_option @necromancer_max_snapshots 20)"
 interval_seconds=$(( interval_minutes * 60 ))
+necro_log_event "autosave" "schedule" "interval_minutes=$interval_minutes" "max_snapshots=$max_snapshots"
 
 last_saved="$(necro_tmux_option "$LAST_SAVE_OPTION" 0)"
 now="$(date +%s)"
 next_run=$(( last_saved + interval_seconds ))
-[ "$now" -lt "$next_run" ] && exit 0
+if [ "$now" -lt "$next_run" ]; then
+  necro_log_event "autosave" "skip" "reason=interval"
+  exit 0
+fi
 
 # ponytail: skip autosave during first 90s of uptime — avoids snapshotting a
 # half-restored server right after boot before necro-resume has run.
 boot_time="$(sysctl -n kern.boottime 2>/dev/null | sed -n 's/.*{ sec = \([0-9][0-9]*\),.*/\1/p')"
-if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then exit 0; fi
+if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then
+  necro_log_event "autosave" "skip" "reason=recent_boot"
+  exit 0
+fi
 
 # ponytail: mkdir is atomic — guarantees only one concurrent status-right fires
 LOCK_DIR="$SNAP_DIR/.autosave.lock"
-mkdir "$LOCK_DIR" 2>/dev/null || exit 0
+mkdir "$LOCK_DIR" 2>/dev/null || { necro_log_event "autosave" "skip" "reason=lock_held"; exit 0; }
+necro_log_event "autosave" "start" "snapshot_dir=$SNAP_DIR"
 tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
 # NOTE: no `trap ... EXIT` here. The real work runs in the backgrounded
 # subshell below, and this parent exits immediately — an EXIT trap on the
@@ -48,6 +56,11 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
 # work it is meant to serialize unprotected. The subshell owns the lock and
 # releases it via its own trap when the work is actually done.
 
+if necro_debug_enabled; then
+  exec 4>> "$LOG"
+else
+  exec 4> /dev/null
+fi
 {
   # The lock is held for the LIFETIME OF THIS SUBSHELL — the work, not just the
   # setup above. Released on any exit path (success, error, kill).
@@ -68,6 +81,7 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
   fi
 
   echo "[$(necro_ts)] autosave complete"
+  necro_log_event "autosave" "complete" "snapshot_dir=$SNAP_DIR"
 
   # Log panes whose agents exited since the last autosave.
   while IFS=$'\t' read -r pane_id cwd; do
@@ -99,6 +113,7 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
     tail -n 5000 "$LOG" > "${LOG}.tmp" && mv "${LOG}.tmp" "$LOG"
     echo "[$(necro_ts)] log rotated to 5000 lines"
   fi
-} >> "$LOG" 2>&1 &
+} >&4 &
+exec 4>&-
 
 exit 0

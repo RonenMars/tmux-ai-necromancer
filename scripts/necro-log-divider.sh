@@ -19,6 +19,12 @@ SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SELF_DIR/../lib/common.sh"
 
+if ! necro_debug_enabled; then
+  necro_warn "Debug logging is off. Set @necromancer_debug to on first."
+  exit 0
+fi
+necro_init_log "$0"
+
 label="${1:-}"
 if [ -z "$label" ]; then
   printf 'Divider label: '
@@ -29,6 +35,7 @@ label="$(printf '%s' "$label" | tr '\n' ' ')"
 [ -z "$label" ] && { necro_err "empty label — nothing written."; exit 1; }
 
 divider="~~~~~~~ $label ~~~~~~~~"
+necro_log_event "debug" "divider" "label=$label"
 
 LOG_DIR="$(necro_log_dir)"
 SNAP_DIR="$(necro_snapshot_dir)"

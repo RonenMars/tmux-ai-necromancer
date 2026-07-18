@@ -21,6 +21,7 @@ necro_init_log "$0"
 IN="$1"
 [ -f "$IN" ] || { necro_err "Not found: $IN"; exit 1; }
 OUT="${IN%.jsonl}.enriched.jsonl"
+necro_log_event "context" "enrich_start" "input=$IN" "output=$OUT"
 
 # Python does the heavy lifting: it knows each agent's transcript layout.
 # Writes to a temp file and renames only on success — a partially-written
@@ -114,3 +115,4 @@ if skipped:
     print(f"Warning: passed through {skipped} malformed record(s) unenriched")
 print(f"Enriched: {out_path}")
 PY
+necro_log_event "context" "enrich_complete" "output=$OUT"

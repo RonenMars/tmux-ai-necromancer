@@ -30,6 +30,7 @@ show() { cat "$(last)" | python3 -m json.tool --json-lines 2>/dev/null || cat "$
 Before each scenario, drop a divider into the logs so the repro is easy to find:
 
 ```bash
+tmux set-option -g @necromancer_debug on
 bash scripts/necro-log-divider.sh "scenario N"
 ```
 
@@ -141,7 +142,9 @@ resume from their pinned uuids, and re-running the resume adds nothing (idempote
 
 ## Where the logs are
 
-Every script mirrors its output to `~/.tmux-ai-necromancer-logs/<script>.log`
-(override with `NECROMANCER_LOG_DIR` or the `@necromancer_log_dir` tmux option).
-The autosave summary log is `<snapshot-dir>/autosave.log`. Use
-`scripts/necro-log-divider.sh "<label>"` to separate one repro from the next.
+With `@necromancer_debug` enabled, every script writes structured lifecycle and action events to
+`~/.tmux-ai-necromancer-logs/<script>.log` (override with
+`NECROMANCER_LOG_DIR` or the `@necromancer_log_dir` tmux option). The autosave
+summary log is `<snapshot-dir>/autosave.log`. Use
+`scripts/necro-log-divider.sh "<label>"` to separate one repro from the next,
+then `scripts/necro-clean-debug-logs.sh` when the investigation is complete.

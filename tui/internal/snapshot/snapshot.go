@@ -9,8 +9,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/debuglog"
 )
 
 // Record matches one line in a snapshot .jsonl.
@@ -34,8 +37,10 @@ type Record struct {
 // LoadFile reads a single .jsonl file. Returns an empty slice for an empty
 // or missing file (callers can choose whether that's an error).
 func LoadFile(path string) ([]Record, error) {
+	debuglog.Event("snapshot", "load_file_start", map[string]string{"path": path})
 	f, err := os.Open(path)
 	if err != nil {
+		debuglog.Event("snapshot", "load_file_error", map[string]string{"path": path, "error": err.Error()})
 		return nil, err
 	}
 	defer f.Close()
@@ -59,17 +64,26 @@ func LoadFile(path string) ([]Record, error) {
 		}
 		recs = append(recs, r)
 	}
-	return recs, sc.Err()
+	err = sc.Err()
+	if err != nil {
+		debuglog.Event("snapshot", "load_file_error", map[string]string{"path": path, "error": err.Error()})
+		return recs, err
+	}
+	debuglog.Event("snapshot", "load_file_complete", map[string]string{"path": path, "records": strconv.Itoa(len(recs))})
+	return recs, nil
 }
 
 // LoadLatest finds the most recently modified *.jsonl in dir and returns its records.
 // dir is typically ~/.claude/tmux-snapshots.
 func LoadLatest(dir string) ([]Record, string, error) {
+	debuglog.Event("snapshot", "load_latest_start", map[string]string{"directory": dir})
 	entries, err := os.ReadDir(dir)
 	if err != nil {
 		if os.IsNotExist(err) {
+			debuglog.Event("snapshot", "load_latest_complete", map[string]string{"records": "0", "reason": "directory_missing"})
 			return nil, "", nil
 		}
+		debuglog.Event("snapshot", "load_latest_error", map[string]string{"error": err.Error()})
 		return nil, "", err
 	}
 
@@ -91,10 +105,16 @@ func LoadLatest(dir string) ([]Record, string, error) {
 	}
 
 	if len(candidates) == 0 {
+		debuglog.Event("snapshot", "load_latest_complete", map[string]string{"records": "0", "reason": "no_snapshots"})
 		return nil, "", nil
 	}
 	sort.Slice(candidates, func(i, j int) bool { return candidates[i].mod > candidates[j].mod })
 	recs, err := LoadFile(candidates[0].path)
+	if err != nil {
+		debuglog.Event("snapshot", "load_latest_error", map[string]string{"path": candidates[0].path, "error": err.Error()})
+	} else {
+		debuglog.Event("snapshot", "load_latest_complete", map[string]string{"path": candidates[0].path, "records": strconv.Itoa(len(recs))})
+	}
 	return recs, candidates[0].path, err
 }
 
@@ -138,16 +158,24 @@ func ExtractResumeUUID(scrollback string) string {
 // Creates the file (and parent dirs) if missing. Used by the TUI to
 // build up a snapshot incrementally as each agent is exited.
 func AppendRecord(path string, r Record) error {
+	debuglog.Event("snapshot", "append_start", map[string]string{"path": path, "pane": r.PaneID, "agent": r.Agent})
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		debuglog.Event("snapshot", "append_error", map[string]string{"path": path, "error": err.Error()})
 		return err
 	}
 	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
 	if err != nil {
+		debuglog.Event("snapshot", "append_error", map[string]string{"path": path, "error": err.Error()})
 		return err
 	}
 	defer f.Close()
 	enc := json.NewEncoder(f)
-	return enc.Encode(r)
+	if err := enc.Encode(r); err != nil {
+		debuglog.Event("snapshot", "append_error", map[string]string{"path": path, "error": err.Error()})
+		return err
+	}
+	debuglog.Event("snapshot", "append_complete", map[string]string{"path": path, "pane": r.PaneID, "agent": r.Agent})
+	return nil
 }
 
 // NewSnapshotPath returns a fresh path for a new snapshot in the

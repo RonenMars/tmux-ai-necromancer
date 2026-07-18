@@ -125,6 +125,7 @@ set -g @necromancer_agents           'claude codex'  # which agents to track
 set -g @necromancer_restore_key      'R'             # prefix key for restore popup
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
+set -g @necromancer_debug           'off'           # write per-command debug logs
 set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
 set -g @necromancer_status           'on'            # show status-right indicator
 set -g @necromancer_status_label     'necro'         # label for the indicator
@@ -164,8 +165,18 @@ The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
 with prior Claude-only setups). Override with the option above or the
 `NECROMANCER_SNAPSHOT_DIR` env var.
 
-Each script writes to its own log file under `~/.tmux-ai-necromancer-logs`
-unless you override `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`.
+Set `@necromancer_debug` to `on` while investigating a problem. Each script
+then writes structured lifecycle and action events to
+`~/.tmux-ai-necromancer-logs/<script>.log`. Override the log location with
+`@necromancer_log_dir` or `NECROMANCER_LOG_DIR`; set
+`NECROMANCER_DEBUG=1` to enable it for one command. Remove the generated files
+with `scripts/necro-clean-debug-logs.sh` (preview with `--dry-run`).
+
+The shell logs also include lifecycle records in the form
+`event phase=<phase> action=<action>`, covering run startup, phases, records,
+tmux mutations, skips, completions, and failures. The TUI writes matching
+structured JSONL events to `~/.tmux-ai-necromancer-logs/tui.log` while debug
+mode is enabled; it never writes scrollback or transcript contents.
 
 ## How it works
 
