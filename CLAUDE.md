@@ -171,6 +171,34 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     Verify new/changed scripts with `bash -n` under `/bin/bash` AND run the
     restore suite with the script forced onto 3.2.
 
+14. **Exit-capture is opt-in, not opt-out, and requires a verified real tty —
+    not a permission-bit check.** `necro-snapshot.sh` defaults to
+    `--idle-only` (zero pane disruption); reaching the exit-keys code path at
+    all requires an explicit `--interactive` or `--yes` flag. Even then, the
+    script refuses to send any keys unless a real controlling terminal is
+    verified by actually attempting to open `/dev/tty`
+    (`{ : </dev/tty; } 2>/dev/null`) — NOT `[ -t 0 ]` (wrong fd, since
+    `necro_init_log` already pipes stdout through `tee`) and NOT
+    `[ -r /dev/tty ]` (false-passes in ttyless contexts: `/dev/tty`'s
+    permission bits allow read access at the `access(2)` level even when
+    there's no controlling terminal for `open(2)` to actually attach to, so
+    the check would pass under cron/launchd/a scripted shell where it must
+    fail). `necro-reboot-prep.sh` mirrors this exact guard independently
+    rather than trusting `necro-snapshot.sh`'s own default, so its `$MODE`
+    tracking — and therefore which snapshot file it globs for and pins as the
+    reboot target — stays consistent with what the child process actually
+    did; without the mirror, a ttyless `--yes` reboot-prep run would have its
+    child downgrade to `.idle-only.jsonl` while the wrapper's stale `$MODE`
+    still searched for a plain `.jsonl`, pinning an unrelated, possibly stale
+    snapshot as the reboot target with no warning. This fixed a real
+    production bug: a ttyless invocation of the interactive capture flow fell
+    through its per-pane approval prompt (`read -r ans </dev/tty || ans=""` —
+    an empty answer on EOF wasn't caught by the prompt's `case` statement,
+    which only explicitly matched `q`/`s`/`n`) straight into sending exit
+    keys, silently exiting every live Claude Code / Codex session it found.
+    Don't remove or weaken this guard to "simplify" the flag parsing or the
+    tty check.
+
 ## Testing
 
 Self-contained bash tests live in `tests/`. Each uses `mktemp -d` + `NECROMANCER_SNAPSHOT_DIR`
@@ -198,6 +226,9 @@ bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent 
 bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
+bash tests/necro-snapshot-no-tty-guard-test.sh    # exit-capture refused without a real controlling tty
+bash tests/necro-snapshot-default-idle-only-test.sh  # bare invocation defaults to idle-only, no pane disruption
+bash tests/necro-snapshot-empty-answer-aborts-test.sh  # EOF on the exit prompt aborts (q), never falls through to exit-keys
 bash tests/necro-restore-layout-test.sh           # restore replays window_layout via select-layout
 bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)
 bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume message too
