@@ -48,7 +48,7 @@ while [ $# -gt 0 ]; do
   esac
 done
 
-stage() { printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
+stage() { necro_log_event "reboot_resume" "stage" "current=$1" "total=$2" "name=$3"; printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
 
 cleanup_empty_windows() {
   local dry_run="${1:-0}"
@@ -109,6 +109,7 @@ fi
 
 necro_hr
 necro_say "Necromancer reboot resume"
+necro_log_event "reboot_resume" "start" "snapshot=$SNAPSHOT" "dry_run=$DRY_RUN"
 echo "  Snapshot: $SNAPSHOT"
 echo "  Dry-run:  $DRY_RUN"
 echo "  Cleanup idle tmux windows: $CLEANUP_EXISTING"
@@ -153,3 +154,4 @@ if [ "$DRY_RUN" = "0" ] && [ "$KEEP_POINTER" = "0" ] && [ -e "$POINTER" ]; then
   rm -f "$POINTER" && necro_ok "Cleared pointer (snapshot file kept)."
 fi
 necro_ok "Reboot resume complete."
+necro_log_event "reboot_resume" "complete" "snapshot=$SNAPSHOT"

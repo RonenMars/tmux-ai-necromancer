@@ -12,6 +12,7 @@ done
 SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SELF_DIR/../lib/common.sh"
+necro_init_log "$0"
 
 dry_run=0
 case "${1:-}" in
@@ -22,6 +23,7 @@ esac
 
 LOG_DIR="$(necro_log_dir)"
 SNAP_DIR="$(necro_snapshot_dir)"
+necro_log_event "cleanup" "start" "dry_run=$dry_run" "log_dir=$LOG_DIR"
 
 count=0
 for file in "$LOG_DIR"/*.log "$SNAP_DIR/autosave.log"; do
@@ -36,8 +38,10 @@ for file in "$LOG_DIR"/*.log "$SNAP_DIR/autosave.log"; do
 done
 
 if [ "$dry_run" = "1" ]; then
+  necro_log_event "cleanup" "complete" "removed=$count" "dry_run=1"
   necro_ok "Would remove $count debug log file(s)"
 else
   rmdir "$LOG_DIR" 2>/dev/null || true
+  necro_log_event "cleanup" "complete" "removed=$count" "dry_run=0"
   necro_ok "Removed $count debug log file(s)"
 fi

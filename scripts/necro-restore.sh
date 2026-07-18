@@ -99,7 +99,7 @@ done
 command -v tmux >/dev/null || { necro_err "tmux not installed."; exit 1; }
 command -v jq   >/dev/null || { necro_err "jq not installed (brew install jq)."; exit 1; }
 
-stage() { printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
+stage() { necro_log_event "restore" "stage" "current=$1" "total=$2" "name=$3"; printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
 
 progress_record() {
   local current="$1" total="$2" message="$3"
@@ -273,7 +273,7 @@ echo "  Allow unsafe cwd paths: $ALLOW_UNSAFE_CWD"
 echo "  Unsafe cwd patterns: $(unsafe_cwd_patterns || true)"
 necro_hr
 
-run() { if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
+run() { necro_log_event "restore" "command" "dry_run=$DRY_RUN" "command=$*"; if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
 
 # Idempotency is keyed on a stable per-PANE marker we set ourselves: the pane
 # option @necro_id = "<cwd>|<uuid>". Marking panes (not windows) lets several
@@ -552,4 +552,5 @@ EOF
 stage 5 5 "cleanup"
 necro_hr
 necro_ok "Done. windows added: $restored, reused: $reused, agents resumed: $resumed, resume skipped: $resume_skipped, records skipped: $skipped, invalid: $invalid"
+necro_log_event "restore" "complete" "restored=$restored" "reused=$reused" "resumed=$resumed" "skipped=$skipped"
 [ "$DRY_RUN" = "1" ] || tmux list-sessions 2>/dev/null || true

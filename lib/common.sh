@@ -95,16 +95,23 @@ necro_debug_enabled() {
   esac
 }
 
-# Write a single shell-command trace line. A DEBUG trap works on macOS's
-# Bash 3.2, unlike BASH_XTRACEFD, and does not alter a status hook's stdout.
-necro_debug_trace() {
-  local source="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
-  printf '[%s] %s:%s: %s\n' \
-    "$(necro_ts)" "${source##*/}" "$LINENO" "$BASH_COMMAND" >&3
+# Emit a machine-searchable lifecycle/action record. Callers should use stable
+# phase and action names and pass only key=value fields (never transcript or
+# scrollback contents).
+necro_log_event() {
+  [ -n "${NECRO_LOG_FILE:-}" ] || return 0
+  local phase="$1" action="$2"
+  shift 2
+  printf '[%s] event phase=%s action=%s' "$(necro_ts)" "$phase" "$action" >&3
+  local field
+  for field in "$@"; do
+    printf ' %s' "$field" >&3
+  done
+  printf '\n' >&3
 }
 
-# Initialize opt-in per-script debug tracing. Stdout and stderr remain
-# untouched; the DEBUG trap writes commands directly to the debug log.
+# Initialize opt-in per-script structured logging. Stdout and stderr remain
+# untouched; callers emit lifecycle and action events via necro_log_event.
 necro_init_log() {
   necro_debug_enabled || return 0
 
@@ -120,15 +127,14 @@ necro_init_log() {
   NECRO_LOG_FILE="$log_dir/$name.log"
   export NECRO_LOG_FILE
   exec 3>> "$NECRO_LOG_FILE"
-  set -o functrace
-  trap 'necro_debug_trace' DEBUG
+  necro_log_event "run" "start" "script=$name"
 }
 
 # --- Logging ----------------------------------------------------------------
-necro_say()  { printf '\033[1;36m▸\033[0m %s\n' "$*"; }
-necro_ok()   { printf '\033[0;32m✓\033[0m %s\n' "$*"; }
-necro_warn() { printf '\033[1;33m⚠\033[0m %s\n' "$*" >&2; }
-necro_err()  { printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; }
+necro_say()  { necro_log_event "message" "info" "text=$*"; printf '\033[1;36m▸\033[0m %s\n' "$*"; }
+necro_ok()   { necro_log_event "message" "success" "text=$*"; printf '\033[0;32m✓\033[0m %s\n' "$*"; }
+necro_warn() { necro_log_event "message" "warning" "text=$*"; printf '\033[1;33m⚠\033[0m %s\n' "$*" >&2; }
+necro_err()  { necro_log_event "message" "error" "text=$*"; printf '\033[1;31m✗\033[0m %s\n' "$*" >&2; }
 necro_hr()   { printf '\n\033[2m─────────────────────────────────────────────\033[0m\n\n'; }
 
 # Timestamp for log lines.

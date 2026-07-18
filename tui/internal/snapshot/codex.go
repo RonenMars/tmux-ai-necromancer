@@ -6,8 +6,11 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
+
+	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/debuglog"
 )
 
 // LatestCodexSessionID returns the id from the most recently modified rollout
@@ -20,6 +23,7 @@ import (
 //
 // Codex stores rollouts under ~/.codex/sessions/YYYY/MM/DD.
 func LatestCodexSessionID(home, cwd string, since time.Time) (string, error) {
+	debuglog.Event("codex", "find_session_start", map[string]string{"cwd": cwd})
 	root := filepath.Join(home, ".codex", "sessions")
 	type entry struct {
 		path string
@@ -48,8 +52,10 @@ func LatestCodexSessionID(home, cwd string, since time.Time) (string, error) {
 	})
 	if err != nil {
 		if os.IsNotExist(err) {
+			debuglog.Event("codex", "find_session_complete", map[string]string{"result": "none", "reason": "sessions_missing"})
 			return "", nil
 		}
+		debuglog.Event("codex", "find_session_error", map[string]string{"error": err.Error()})
 		return "", err
 	}
 
@@ -64,9 +70,11 @@ func LatestCodexSessionID(home, cwd string, since time.Time) (string, error) {
 		}
 		id, ok := codexMetaForCWD(e.path, cwd)
 		if ok {
+			debuglog.Event("codex", "find_session_complete", map[string]string{"result": "matched", "candidates": strconv.Itoa(len(entries))})
 			return id, nil
 		}
 	}
+	debuglog.Event("codex", "find_session_complete", map[string]string{"result": "none", "candidates": strconv.Itoa(len(entries))})
 	return "", nil
 }
 

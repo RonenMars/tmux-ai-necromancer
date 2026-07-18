@@ -13,6 +13,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 
+	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/debuglog"
 	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/snapshot"
 	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/tmux"
 )
@@ -66,6 +67,7 @@ type Options struct {
 
 // New builds the initial model. It does not load data — that happens on Init.
 func New(opts Options) Model {
+	debuglog.Event("model", "new", map[string]string{"dry_run": fmt.Sprint(opts.DryRun)})
 	cols := []table.Column{
 		{Title: "Pane", Width: 5},
 		{Title: "Session", Width: 12},
@@ -134,12 +136,19 @@ func (m Model) Init() tea.Cmd {
 
 func loadCmd() tea.Cmd {
 	return func() tea.Msg {
+		debuglog.Event("load", "start", nil)
 		panes, err := tmux.ListPanes()
 		if err != nil {
+			debuglog.Event("load", "error", map[string]string{"error": err.Error()})
 			return dataMsg{err: err}
 		}
 		dir := snapshotDir()
 		recs, path, err := snapshot.LoadLatest(dir)
+		if err != nil {
+			debuglog.Event("load", "error", map[string]string{"error": err.Error()})
+		} else {
+			debuglog.Event("load", "complete", map[string]string{"panes": fmt.Sprint(len(panes)), "records": fmt.Sprint(len(recs))})
+		}
 		return dataMsg{
 			panes:        panes,
 			records:      recs,
@@ -153,7 +162,13 @@ func loadCmd() tea.Cmd {
 // the user can preview what's there before pressing /exit.
 func captureScrollbackCmd(paneID string) tea.Cmd {
 	return func() tea.Msg {
+		debuglog.Event("review", "capture_scrollback_start", map[string]string{"pane": paneID})
 		text, err := tmux.CapturePane(paneID, 50)
+		if err != nil {
+			debuglog.Event("review", "capture_scrollback_error", map[string]string{"pane": paneID, "error": err.Error()})
+		} else {
+			debuglog.Event("review", "capture_scrollback_complete", map[string]string{"pane": paneID})
+		}
 		return scrollbackMsg{paneID: paneID, text: text, err: err}
 	}
 }
@@ -190,7 +205,9 @@ func agentForCommand(s string) (agentSpec, bool) {
 
 func runExitCmd(pane tmux.Pane, agent agentSpec, dryRun bool) tea.Cmd {
 	return func() tea.Msg {
+		debuglog.Event("exit", "start", map[string]string{"pane": pane.PaneID, "agent": agent.name, "dry_run": fmt.Sprint(dryRun)})
 		if dryRun {
+			debuglog.Event("exit", "complete", map[string]string{"pane": pane.PaneID, "result": "dry_run"})
 			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, uuid: "dry-run-no-uuid"}
 		}
 		// Record the time before sending the exit command so LatestCodexSessionID
@@ -199,6 +216,7 @@ func runExitCmd(pane tmux.Pane, agent agentSpec, dryRun bool) tea.Cmd {
 		exitStart := time.Now()
 		// 1. Send the agent's exit command + Enter.
 		if err := tmux.SendKeys(pane.PaneID, agent.exitKeys, "Enter"); err != nil {
+			debuglog.Event("exit", "send_error", map[string]string{"pane": pane.PaneID, "error": err.Error()})
 			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 		}
 		// 2. Poll up to 20s for the pane's foreground to leave the agent.
@@ -209,27 +227,34 @@ func runExitCmd(pane tmux.Pane, agent agentSpec, dryRun bool) tea.Cmd {
 			time.Sleep(pollEvery)
 			cmd, err := tmux.PaneCurrentCommand(pane.PaneID)
 			if err != nil {
+				debuglog.Event("exit", "poll_error", map[string]string{"pane": pane.PaneID, "error": err.Error()})
 				return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 			}
 			if strings.TrimSpace(cmd) != agent.name {
+				debuglog.Event("exit", "agent_exited", map[string]string{"pane": pane.PaneID})
 				goto captured
 			}
 		}
+		debuglog.Event("exit", "timeout", map[string]string{"pane": pane.PaneID})
 		return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, timedOut: true}
 	captured:
 		// 3. Capture scrollback and pull the UUID out.
 		text, err := tmux.CapturePane(pane.PaneID, 100)
 		if err != nil {
+			debuglog.Event("exit", "capture_error", map[string]string{"pane": pane.PaneID, "error": err.Error()})
 			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 		}
 		home, err := os.UserHomeDir()
 		if err != nil {
+			debuglog.Event("exit", "home_error", map[string]string{"error": err.Error()})
 			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 		}
 		uuid, err := uuidForAgent(agent.name, text, home, pane.CWD, exitStart)
 		if err != nil {
+			debuglog.Event("exit", "uuid_error", map[string]string{"pane": pane.PaneID, "error": err.Error()})
 			return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, err: err}
 		}
+		debuglog.Event("exit", "complete", map[string]string{"pane": pane.PaneID, "uuid_found": fmt.Sprint(uuid != "")})
 		return exitDoneMsg{paneID: pane.PaneID, agent: agent.name, uuid: uuid}
 	}
 }
@@ -257,6 +282,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// Universal quit on Ctrl-C from any mode.
 	if k, ok := msg.(tea.KeyMsg); ok && k.String() == "ctrl+c" {
+		debuglog.Event("run", "quit", map[string]string{"source": "ctrl_c"})
 		return m, tea.Quit
 	}
 
@@ -278,6 +304,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleDataMsg(d dataMsg) Model {
 	if d.err != nil {
+		debuglog.Event("load", "display_error", map[string]string{"error": d.err.Error()})
 		m.err = d.err
 		m.status = fmt.Sprintf("error: %v", d.err)
 		return m
@@ -286,6 +313,7 @@ func (m Model) handleDataMsg(d dataMsg) Model {
 	m.bySnapshotID = snapshot.IndexByPaneID(d.records)
 	m.snapshotPath = d.snapshotPath
 	m.rebuildRows()
+	debuglog.Event("load", "display_complete", map[string]string{"panes": fmt.Sprint(len(m.panes)), "records": fmt.Sprint(len(d.records))})
 	switch {
 	case len(m.panes) == 0:
 		m.status = "no tmux server / no panes"
@@ -302,11 +330,14 @@ func (m Model) updateTable(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
 		case "q":
+			debuglog.Event("table", "quit", nil)
 			return m, tea.Quit
 		case "r":
+			debuglog.Event("table", "reload", nil)
 			m.status = "reloading…"
 			return m, loadCmd()
 		case "e", "enter":
+			debuglog.Event("table", "review_selected", nil)
 			return m.beginReview()
 		}
 	}
@@ -321,20 +352,24 @@ func (m Model) beginReview() (tea.Model, tea.Cmd) {
 	idx := m.table.Cursor()
 	pane := m.paneAtRow(idx)
 	if pane == nil {
+		debuglog.Event("review", "rejected", map[string]string{"reason": "no_selection"})
 		m.status = "no pane selected"
 		return m, nil
 	}
 	if pane.PaneID == os.Getenv("TMUX_PANE") {
+		debuglog.Event("review", "rejected", map[string]string{"pane": pane.PaneID, "reason": "own_pane"})
 		m.status = "refusing to exit the TUI's own pane"
 		return m, nil
 	}
 	if _, ok := agentForCommand(pane.CurrentCommand); !ok {
+		debuglog.Event("review", "rejected", map[string]string{"pane": pane.PaneID, "reason": "unsupported_agent"})
 		m.status = fmt.Sprintf("pane %s is running '%s', not a supported agent", pane.PaneID, pane.CurrentCommand)
 		return m, nil
 	}
 	m.selectedPane = pane
 	m.scrollback = "loading scrollback…"
 	m.mode = modeReview
+	debuglog.Event("review", "start", map[string]string{"pane": pane.PaneID})
 	return m, captureScrollbackCmd(pane.PaneID)
 }
 
@@ -379,11 +414,13 @@ func (m Model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if k, ok := msg.(tea.KeyMsg); ok {
 		switch k.String() {
 		case "b", "esc":
+			debuglog.Event("review", "back", map[string]string{"pane": m.selectedPane.PaneID})
 			m.mode = modeTable
 			m.selectedPane = nil
 			m.scrollback = ""
 			return m, nil
 		case "s":
+			debuglog.Event("review", "skip", map[string]string{"pane": m.selectedPane.PaneID})
 			m.mode = modeTable
 			m.status = fmt.Sprintf("skipped %s", m.selectedPane.PaneID)
 			m.selectedPane = nil
@@ -398,11 +435,13 @@ func (m Model) updateReview(msg tea.Msg) (tea.Model, tea.Cmd) {
 // beginExit sends /exit to the reviewed pane and switches to modeExiting.
 func (m Model) beginExit() (tea.Model, tea.Cmd) {
 	if m.selectedPane == nil {
+		debuglog.Event("exit", "rejected", map[string]string{"reason": "no_selection"})
 		m.mode = modeTable
 		return m, nil
 	}
 	agent, ok := agentForCommand(m.selectedPane.CurrentCommand)
 	if !ok {
+		debuglog.Event("exit", "rejected", map[string]string{"pane": m.selectedPane.PaneID, "reason": "unsupported_agent"})
 		m.mode = modeTable
 		m.status = fmt.Sprintf("pane %s is no longer a supported agent", m.selectedPane.PaneID)
 		return m, nil
@@ -412,6 +451,7 @@ func (m Model) beginExit() (tea.Model, tea.Cmd) {
 	m.exitDeadlineHit = false
 	m.status = fmt.Sprintf("sending %s to %s%s",
 		agent.exitKeys, m.selectedPane.PaneID, dryRunSuffix(m.dryRun))
+	debuglog.Event("exit", "scheduled", map[string]string{"pane": m.selectedPane.PaneID, "agent": agent.name})
 	return m, tea.Batch(
 		runExitCmd(*m.selectedPane, agent, m.dryRun),
 		tickCmd(),
@@ -442,15 +482,18 @@ func (m Model) finishExit(msg exitDoneMsg) Model {
 	m.mode = modeTable
 
 	if msg.err != nil {
+		debuglog.Event("exit", "failed", map[string]string{"pane": msg.paneID, "error": msg.err.Error()})
 		m.status = fmt.Sprintf("exit failed for %s: %v", msg.paneID, msg.err)
 		return m
 	}
 	if msg.timedOut {
+		debuglog.Event("exit", "failed", map[string]string{"pane": msg.paneID, "reason": "timeout"})
 		m.exitDeadlineHit = true
 		m.status = fmt.Sprintf("timed out waiting for shell on %s", msg.paneID)
 		return m
 	}
 	if msg.uuid == "" {
+		debuglog.Event("exit", "failed", map[string]string{"pane": msg.paneID, "reason": "uuid_missing"})
 		if msg.agent == "codex" {
 			m.status = fmt.Sprintf("exited %s but no Codex rollout found matching pane CWD", msg.paneID)
 		} else {
@@ -461,11 +504,13 @@ func (m Model) finishExit(msg exitDoneMsg) Model {
 	// Success.
 	m.captured[msg.paneID] = msg.uuid
 	if err := m.persistCapture(msg.paneID, msg.agent, msg.uuid); err != nil {
+		debuglog.Event("persist", "error", map[string]string{"pane": msg.paneID, "error": err.Error()})
 		m.status = fmt.Sprintf("captured %s=%s but write failed: %v", msg.paneID, shortUUID(msg.uuid), err)
 		return m
 	}
 	m.status = fmt.Sprintf("captured %s → %s%s",
 		msg.paneID, shortUUID(msg.uuid), dryRunSuffix(m.dryRun))
+	debuglog.Event("persist", "complete", map[string]string{"pane": msg.paneID, "agent": msg.agent})
 	return m
 }
 
@@ -473,11 +518,13 @@ func (m Model) finishExit(msg exitDoneMsg) Model {
 // snapshot file. Lazy-creates the path on first call.
 func (m *Model) persistCapture(paneID, agent, uuid string) error {
 	if m.dryRun {
+		debuglog.Event("persist", "skipped", map[string]string{"reason": "dry_run"})
 		return nil
 	}
 	if m.sessionFile == "" {
 		dir := snapshotDir()
 		m.sessionFile = snapshot.NewSnapshotPath(dir)
+		debuglog.Event("persist", "new_snapshot", map[string]string{"path": m.sessionFile})
 	}
 	// Find the pane to fill its full context.
 	var pane *tmux.Pane
@@ -488,6 +535,7 @@ func (m *Model) persistCapture(paneID, agent, uuid string) error {
 		}
 	}
 	if pane == nil {
+		debuglog.Event("persist", "error", map[string]string{"pane": paneID, "reason": "pane_missing"})
 		return fmt.Errorf("pane %s no longer in state", paneID)
 	}
 	rec := recordForPane(*pane, agent, uuid)

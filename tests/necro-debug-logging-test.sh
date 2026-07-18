@@ -28,8 +28,7 @@ run_probe off
 run_probe on
 LOG="$NECROMANCER_LOG_DIR/probe.log"
 [ -f "$LOG" ] || { echo "debug-enabled run did not create a log" >&2; exit 1; }
-grep -q 'debug probe' "$LOG"
-grep -q 'echo.*debug probe' "$LOG"
+grep -q 'event phase=run action=start script=probe' "$LOG"
 
 TMPBIN="$TMP/bin"
 mkdir -p "$TMPBIN"

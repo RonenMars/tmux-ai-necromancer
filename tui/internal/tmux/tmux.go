@@ -7,6 +7,8 @@ import (
 	"os/exec"
 	"strconv"
 	"strings"
+
+	"github.com/RonenMars/tmux-ai-necromancer/tui/internal/debuglog"
 )
 
 // isNoServer detects the well-known stderr fragment that tmux prints
@@ -34,6 +36,7 @@ type Pane struct {
 // ListPanes shells out to `tmux list-panes -a` and parses the result.
 // Returns an empty slice (not nil, not error) when no tmux server is running.
 func ListPanes() ([]Pane, error) {
+	debuglog.Event("tmux", "list_panes_start", nil)
 	const sep = "\x1f" // ASCII unit separator — won't appear in tmux fields
 	format := strings.Join([]string{
 		"#{pane_id}",
@@ -48,8 +51,10 @@ func ListPanes() ([]Pane, error) {
 	out, err := cmd.Output()
 	if err != nil {
 		if isNoServer(err) {
+			debuglog.Event("tmux", "list_panes_complete", map[string]string{"panes": "0", "server": "absent"})
 			return []Pane{}, nil
 		}
+		debuglog.Event("tmux", "list_panes_error", map[string]string{"error": err.Error()})
 		return nil, fmt.Errorf("tmux list-panes: %w", err)
 	}
 
@@ -72,6 +77,7 @@ func ListPanes() ([]Pane, error) {
 			CurrentCommand: fields[5],
 		})
 	}
+	debuglog.Event("tmux", "list_panes_complete", map[string]string{"panes": strconv.Itoa(len(panes))})
 	return panes, nil
 }
 
@@ -79,6 +85,7 @@ func ListPanes() ([]Pane, error) {
 // plus its history (top), via `tmux capture-pane -p -t <pane> -S -<lines>`.
 // Use a positive number; 0 returns just the visible buffer.
 func CapturePane(paneID string, lines int) (string, error) {
+	debuglog.Event("tmux", "capture_pane_start", map[string]string{"pane": paneID, "lines": strconv.Itoa(lines)})
 	args := []string{"capture-pane", "-p", "-t", paneID}
 	if lines > 0 {
 		args = append(args, "-S", fmt.Sprintf("-%d", lines))
@@ -86,10 +93,13 @@ func CapturePane(paneID string, lines int) (string, error) {
 	out, err := exec.Command("tmux", args...).Output()
 	if err != nil {
 		if isNoServer(err) {
+			debuglog.Event("tmux", "capture_pane_error", map[string]string{"pane": paneID, "error": "no_server"})
 			return "", fmt.Errorf("tmux capture-pane: no server")
 		}
+		debuglog.Event("tmux", "capture_pane_error", map[string]string{"pane": paneID, "error": err.Error()})
 		return "", fmt.Errorf("tmux capture-pane %s: %w", paneID, err)
 	}
+	debuglog.Event("tmux", "capture_pane_complete", map[string]string{"pane": paneID})
 	return string(out), nil
 }
 
@@ -97,25 +107,32 @@ func CapturePane(paneID string, lines int) (string, error) {
 // Each variadic arg is a separate `tmux send-keys` token — pass "Enter"
 // for the Enter key, "/exit" for the literal string, etc.
 func SendKeys(paneID string, keys ...string) error {
+	debuglog.Event("tmux", "send_keys_start", map[string]string{"pane": paneID, "key_count": strconv.Itoa(len(keys))})
 	args := append([]string{"send-keys", "-t", paneID}, keys...)
 	cmd := exec.Command("tmux", args...)
 	if out, err := cmd.CombinedOutput(); err != nil {
+		debuglog.Event("tmux", "send_keys_error", map[string]string{"pane": paneID, "error": err.Error()})
 		return fmt.Errorf("tmux send-keys %s: %w (%s)", paneID, err, strings.TrimSpace(string(out)))
 	}
+	debuglog.Event("tmux", "send_keys_complete", map[string]string{"pane": paneID})
 	return nil
 }
 
 // PaneCurrentCommand returns the foreground command of a single pane,
 // e.g. "claude", "zsh", "node". Useful for polling after /exit.
 func PaneCurrentCommand(paneID string) (string, error) {
+	debuglog.Event("tmux", "pane_command_start", map[string]string{"pane": paneID})
 	out, err := exec.Command(
 		"tmux", "display-message", "-p", "-t", paneID, "#{pane_current_command}",
 	).Output()
 	if err != nil {
 		if isNoServer(err) {
+			debuglog.Event("tmux", "pane_command_error", map[string]string{"pane": paneID, "error": "no_server"})
 			return "", fmt.Errorf("tmux display-message: no server")
 		}
+		debuglog.Event("tmux", "pane_command_error", map[string]string{"pane": paneID, "error": err.Error()})
 		return "", fmt.Errorf("tmux display-message %s: %w", paneID, err)
 	}
+	debuglog.Event("tmux", "pane_command_complete", map[string]string{"pane": paneID})
 	return strings.TrimSpace(string(out)), nil
 }

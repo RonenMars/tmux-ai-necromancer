@@ -35,6 +35,7 @@ label="$(printf '%s' "$label" | tr '\n' ' ')"
 [ -z "$label" ] && { necro_err "empty label — nothing written."; exit 1; }
 
 divider="~~~~~~~ $label ~~~~~~~~"
+necro_log_event "debug" "divider" "label=$label"
 
 LOG_DIR="$(necro_log_dir)"
 SNAP_DIR="$(necro_snapshot_dir)"

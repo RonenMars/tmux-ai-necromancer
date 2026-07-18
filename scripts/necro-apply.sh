@@ -49,7 +49,7 @@ ROUTING_TABLE="$(cat <<'EOF'
 EOF
 )"
 
-run() { if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
+run() { necro_log_event "apply" "command" "dry_run=$DRY_RUN" "command=$*"; if [ "$DRY_RUN" = "1" ]; then echo "  DRY: $*"; else "$@"; fi; }
 
 # Pacing between resume launches. Firing every `claude --resume` back-to-back
 # spikes CPU/memory (transcript read + initial API call) enough to stall the
@@ -117,6 +117,7 @@ RESUME_BATCH="$(resume_batch_size)"
 RESUME_BATCH_COUNT=0
 RESUME_MESSAGE="$(resume_message)"
 RESUME_MESSAGE_DELAY="$(resume_message_delay)"
+necro_log_event "apply" "start" "input=$IN" "dry_run=$DRY_RUN"
 
 match_route() {
   local cwd="$1" glob session root
@@ -147,6 +148,7 @@ while IFS= read -r line; do
   dest=$(jq -r '.dest_session // empty' <<<"$line")
 
   echo "[$pane_id] from $session '$win_name' (agent=${agent:-none})"
+  necro_log_event "apply" "record" "pane=$pane_id" "agent=${agent:-none}"
 
   window_id="$(tmux list-panes -a -F '#{pane_id} #{window_id}' 2>/dev/null | awk -v p="$pane_id" '$1==p {print $2; exit}')"
   [ -z "$window_id" ] && { echo "  SKIP: pane gone"; continue; }
@@ -190,4 +192,5 @@ while IFS= read -r line; do
 done < "$IN"
 
 echo; necro_ok "Apply complete."
+necro_log_event "apply" "complete" "input=$IN"
 [ "$DRY_RUN" = "1" ] || tmux list-sessions 2>/dev/null || true

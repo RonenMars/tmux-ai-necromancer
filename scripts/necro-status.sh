@@ -42,7 +42,9 @@ while IFS=$'\t' read -r pane_id cmd; do
 done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_command}' 2>/dev/null)
 
 if [ "$exited" -gt 0 ]; then
+  necro_log_event "status" "render" "tracked=$tracked" "active=$active" "exited=$exited"
   printf ' %s:%d/%d+%d ' "$label" "$tracked" "$active" "$exited"
 else
+  necro_log_event "status" "render" "tracked=$tracked" "active=$active" "exited=0"
   printf ' %s:%d/%d ' "$label" "$tracked" "$active"
 fi

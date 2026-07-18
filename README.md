@@ -166,11 +166,17 @@ with prior Claude-only setups). Override with the option above or the
 `NECROMANCER_SNAPSHOT_DIR` env var.
 
 Set `@necromancer_debug` to `on` while investigating a problem. Each script
-then writes an execution trace (timestamp, source line, and command) to
+then writes structured lifecycle and action events to
 `~/.tmux-ai-necromancer-logs/<script>.log`. Override the log location with
 `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`; set
 `NECROMANCER_DEBUG=1` to enable it for one command. Remove the generated files
 with `scripts/necro-clean-debug-logs.sh` (preview with `--dry-run`).
+
+The shell logs also include lifecycle records in the form
+`event phase=<phase> action=<action>`, covering run startup, phases, records,
+tmux mutations, skips, completions, and failures. The TUI writes matching
+structured JSONL events to `~/.tmux-ai-necromancer-logs/tui.log` while debug
+mode is enabled; it never writes scrollback or transcript contents.
 
 ## How it works
 

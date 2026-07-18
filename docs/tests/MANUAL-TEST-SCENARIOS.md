@@ -142,7 +142,7 @@ resume from their pinned uuids, and re-running the resume adds nothing (idempote
 
 ## Where the logs are
 
-With `@necromancer_debug` enabled, every script writes a command trace to
+With `@necromancer_debug` enabled, every script writes structured lifecycle and action events to
 `~/.tmux-ai-necromancer-logs/<script>.log` (override with
 `NECROMANCER_LOG_DIR` or the `@necromancer_log_dir` tmux option). The autosave
 summary log is `<snapshot-dir>/autosave.log`. Use

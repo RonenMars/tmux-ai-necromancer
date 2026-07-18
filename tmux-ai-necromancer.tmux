@@ -40,6 +40,7 @@ set_default "@necromancer_status"          "on"
 set_default "@necromancer_status_label"    "necro"
 set_default "@necromancer_resume_delay"       "5"
 set_default "@necromancer_resume_batch_size"  "1"
+necro_log_event "plugin" "configure_defaults" "debug=$(necro_tmux_option @necromancer_debug off)"
 
 AUTOSAVE="$CURRENT_DIR/scripts/necro-autosave.sh"
 
@@ -51,6 +52,7 @@ case "$status_right" in
   *necro-autosave.sh*) : ;;  # already wired
   *) tmux set-option -gq status-right "#($AUTOSAVE)$status_right" ;;
 esac
+necro_log_event "plugin" "wire_autosave" "script=$AUTOSAVE"
 
 WATCHER="$CURRENT_DIR/scripts/necro-watch.sh"
 
@@ -59,6 +61,7 @@ case "$status_right" in
   *necro-watch.sh*) : ;;  # already wired
   *) tmux set-option -gq status-right "#($WATCHER)$status_right" ;;
 esac
+necro_log_event "plugin" "wire_watcher" "script=$WATCHER"
 
 STATUS="$CURRENT_DIR/scripts/necro-status.sh"
 
@@ -67,8 +70,10 @@ case "$status_right" in
   *necro-status.sh*) : ;;  # already wired
   *) tmux set-option -gq status-right "#($STATUS)$status_right" ;;
 esac
+necro_log_event "plugin" "wire_status" "script=$STATUS"
 
 # Bind <prefix> <restore_key> to the restore script in a popup.
 restore_key="$(tmux show-option -gqv @necromancer_restore_key 2>/dev/null)"
 [ -z "$restore_key" ] && restore_key="R"
 tmux bind-key "$restore_key" run-shell "tmux display-popup -E '$CURRENT_DIR/scripts/necro-restore.sh; echo; echo Press enter to close; read'"
+necro_log_event "plugin" "bind_restore" "key=$restore_key"

@@ -37,7 +37,10 @@ necro_load_agents
 LAST_WATCH_OPT="@necromancer_last_watch"
 now="$(date +%s)"
 last="$(necro_tmux_option "$LAST_WATCH_OPT" 0)"
-[ "$(( now - last ))" -lt 1 ] && exit 0
+if [ "$(( now - last ))" -lt 1 ]; then
+  necro_log_event "watch" "skip" "reason=throttled"
+  exit 0
+fi
 
 # mkdir is the only POSIX-atomic primitive available here. Unlike autosave,
 # this script does its work in the foreground, so a plain EXIT trap correctly
@@ -57,6 +60,7 @@ if [ -d "$WATCH_LOCK" ]; then
 fi
 mkdir "$WATCH_LOCK" 2>/dev/null || exit 0
 trap 'rmdir "$WATCH_LOCK" 2>/dev/null' EXIT
+necro_log_event "watch" "start" "cursor_dir=$WATCH_LOCK"
 
 tmux set-option -gq "$LAST_WATCH_OPT" "$now"
 
@@ -77,6 +81,7 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
 
   # ── Case 1: agent restarted in a pane that previously exited ──────────────
   if [ -n "$agent" ] && [ "$exited" = "1" ]; then
+    necro_log_event "watch" "agent_restart" "pane=$pane_id" "agent=$agent"
     tmux set-option -pu -t "$pane_id" @necro_uuid            2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_cmd             2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_agent           2>/dev/null || true
@@ -111,6 +116,7 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
       uuid="$(necro_agent_pop_session_id "$agent" "$cwd" "$first_seen" 2>/dev/null || true)"
     fi
     if [ -n "$uuid" ]; then
+      necro_log_event "watch" "pin_uuid" "pane=$pane_id" "agent=$agent"
       tmux set-option -p -t "$pane_id" @necro_uuid  "$uuid"  2>/dev/null || true
       tmux set-option -p -t "$pane_id" @necro_cmd   "$cmd"   2>/dev/null || true
       tmux set-option -p -t "$pane_id" @necro_agent "$agent" 2>/dev/null || true
@@ -120,6 +126,7 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
 
   # ── Case 3: agent exited (had @necro_cmd set, current cmd no longer matches) ─
   if [ -n "$pinned_cmd" ] && [ -z "$agent" ] && [ "$exited" != "1" ]; then
+    necro_log_event "watch" "agent_exit" "pane=$pane_id" "agent=${pinned_agent:-$pinned_cmd}"
     # Use the stored adapter name for scraping (not the raw command name).
     scrape_agent="${pinned_agent:-$pinned_cmd}"
     # Scrape farewell UUID from scrollback — more reliable than what we popped.
