@@ -169,8 +169,9 @@ Set `@necromancer_debug` to `on` while investigating a problem. Each script
 then writes structured lifecycle and action events to
 `~/.tmux-ai-necromancer-logs/<script>.log`. Override the log location with
 `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`; set
-`NECROMANCER_DEBUG=1` to enable it for one command. Remove the generated files
-with `scripts/necro-clean-debug-logs.sh` (preview with `--dry-run`).
+`NECROMANCER_DEBUG=1` to enable it for one command. See the
+[debug logging guide](docs/DEBUG_LOGGING.md) for cleanup, cross-platform use,
+and expected disk usage.
 
 The shell logs also include lifecycle records in the form
 `event phase=<phase> action=<action>`, covering run startup, phases, records,

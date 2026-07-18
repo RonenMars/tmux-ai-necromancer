@@ -49,10 +49,16 @@ status_output="$(PATH="$TMPBIN:$PATH" NECROMANCER_DEBUG=on bash "$ROOT/scripts/n
 mkdir -p "$NECROMANCER_SNAPSHOT_DIR"
 printf 'autosave debug log\n' > "$NECROMANCER_SNAPSHOT_DIR/autosave.log"
 
-bash "$ROOT/scripts/necro-clean-debug-logs.sh" --dry-run | grep -q 'Would remove 3 debug log file'
+NECROMANCER_DEBUG=off bash "$ROOT/scripts/necro-clean-debug-logs.sh" --dry-run | grep -q 'Would remove 3 debug log file'
 [ -f "$LOG" ] || { echo "dry-run removed a log" >&2; exit 1; }
-bash "$ROOT/scripts/necro-clean-debug-logs.sh" | grep -q 'Removed 3 debug log file'
+NECROMANCER_DEBUG=off bash "$ROOT/scripts/necro-clean-debug-logs.sh" | grep -q 'Removed 3 debug log file'
 [ ! -e "$LOG" ] || { echo "cleanup did not remove the log" >&2; exit 1; }
 [ ! -e "$NECROMANCER_SNAPSHOT_DIR/autosave.log" ] || { echo "cleanup did not remove autosave log" >&2; exit 1; }
+
+NECROMANCER_DEBUG=on bash "$ROOT/scripts/necro-clean-debug-logs.sh" | grep -q 'Removed 1 debug log file'
+[ ! -e "$NECROMANCER_LOG_DIR/necro-clean-debug-logs.log" ] || {
+  echo "cleanup recreated its own debug log" >&2
+  exit 1
+}
 
 echo "PASS: debug logging is opt-in and cleanup removes generated logs"

@@ -38,10 +38,8 @@ for file in "$LOG_DIR"/*.log "$SNAP_DIR/autosave.log"; do
 done
 
 if [ "$dry_run" = "1" ]; then
-  necro_log_event "cleanup" "complete" "removed=$count" "dry_run=1"
   necro_ok "Would remove $count debug log file(s)"
 else
   rmdir "$LOG_DIR" 2>/dev/null || true
-  necro_log_event "cleanup" "complete" "removed=$count" "dry_run=0"
   necro_ok "Removed $count debug log file(s)"
 fi
