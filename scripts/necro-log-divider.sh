@@ -19,6 +19,12 @@ SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 # shellcheck source=../lib/common.sh
 . "$SELF_DIR/../lib/common.sh"
 
+if ! necro_debug_enabled; then
+  necro_warn "Debug logging is off. Set @necromancer_debug to on first."
+  exit 0
+fi
+necro_init_log "$0"
+
 label="${1:-}"
 if [ -z "$label" ]; then
   printf 'Divider label: '

@@ -48,6 +48,11 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
 # work it is meant to serialize unprotected. The subshell owns the lock and
 # releases it via its own trap when the work is actually done.
 
+if necro_debug_enabled; then
+  exec 4>> "$LOG"
+else
+  exec 4> /dev/null
+fi
 {
   # The lock is held for the LIFETIME OF THIS SUBSHELL — the work, not just the
   # setup above. Released on any exit path (success, error, kill).
@@ -99,6 +104,7 @@ tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
     tail -n 5000 "$LOG" > "${LOG}.tmp" && mv "${LOG}.tmp" "$LOG"
     echo "[$(necro_ts)] log rotated to 5000 lines"
   fi
-} >> "$LOG" 2>&1 &
+} >&4 &
+exec 4>&-
 
 exit 0

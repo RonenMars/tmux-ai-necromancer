@@ -4,8 +4,8 @@
 # Sourced, never executed. Provides:
 #   - PLUGIN_ROOT resolution (path-agnostic; works wherever the repo is cloned)
 #   - snapshot dir resolution (honors @necromancer_snapshot_dir / env / default)
-#   - log dir resolution (honors @necromancer_log_dir / env / default)
-#   - logging helpers
+#   - debug log resolution (honors @necromancer_log_dir / env / default)
+#   - opt-in debug tracing helpers
 #   - JSON string escaping
 #   - tmux option getters
 #
@@ -79,18 +79,49 @@ necro_log_dir() {
   printf '%s' "$HOME/.tmux-ai-necromancer-logs"
 }
 
-# Initialize per-script logging. Mirrors stdout/stderr to a log file in the
-# configured log dir while preserving interactive output.
+# --- Debug logging ----------------------------------------------------------
+# Precedence: explicit env var > tmux option > disabled. When enabled, every
+# command after initialization is traced to the script's log file.
+necro_debug_enabled() {
+  local value
+  if [ -n "${NECROMANCER_DEBUG+x}" ]; then
+    value="$NECROMANCER_DEBUG"
+  else
+    value="$(necro_tmux_option @necromancer_debug "off")"
+  fi
+  case "$value" in
+    1|on|true|yes) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Write a single shell-command trace line. A DEBUG trap works on macOS's
+# Bash 3.2, unlike BASH_XTRACEFD, and does not alter a status hook's stdout.
+necro_debug_trace() {
+  local source="${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}"
+  printf '[%s] %s:%s: %s\n' \
+    "$(necro_ts)" "${source##*/}" "$LINENO" "$BASH_COMMAND" >&3
+}
+
+# Initialize opt-in per-script debug tracing. Stdout and stderr remain
+# untouched; the DEBUG trap writes commands directly to the debug log.
 necro_init_log() {
+  necro_debug_enabled || return 0
+
   local script="${1:-${BASH_SOURCE[1]:-${BASH_SOURCE[0]}}}"
   local name log_dir
   name="$(basename "$script")"
   name="${name%.*}"
   log_dir="$(necro_log_dir)"
-  mkdir -p "$log_dir"
+  mkdir -p "$log_dir" || {
+    necro_warn "could not create debug log directory: $log_dir"
+    return 0
+  }
   NECRO_LOG_FILE="$log_dir/$name.log"
   export NECRO_LOG_FILE
-  exec > >(tee -a "$NECRO_LOG_FILE") 2>&1
+  exec 3>> "$NECRO_LOG_FILE"
+  set -o functrace
+  trap 'necro_debug_trace' DEBUG
 }
 
 # --- Logging ----------------------------------------------------------------
