@@ -17,6 +17,10 @@
 #   necro-reboot-prep.sh --interactive  # prompt per live agent (default is idle-only)
 #   necro-reboot-prep.sh --no-enrich    # skip context enrichment
 #   necro-reboot-prep.sh --dry-run      # show plan, change nothing
+#
+# --yes and --interactive both require a real controlling terminal; when run
+# ttyless (cron, launchd, safe-reboot/safe-shutdown, or any scripted caller)
+# they're silently downgraded to --idle-only.
 # =============================================================================
 set -uo pipefail
 
@@ -55,6 +59,16 @@ fi
 command -v tmux >/dev/null || { necro_err "tmux not installed."; exit 1; }
 tmux list-sessions >/dev/null 2>&1 || { necro_err "No tmux server running."; exit 1; }
 
+# Exit-capture needs a real controlling terminal. NOTE: [ -r /dev/tty ] is NOT
+# sufficient — /dev/tty is 0666, so access(2) passes in cron/launchd/scripted
+# contexts where open(2) fails ENXIO. Attempt the actual open.
+if [ "$MODE" != "idle-only" ] && ! { : </dev/tty; } 2>/dev/null; then
+  necro_warn "No controlling terminal — refusing exit-capture; downgrading to --idle-only."
+  necro_warn "No keys will be sent to any pane."
+  tmux display-message "necromancer: refused exit-capture (no tty) — idle-only snapshot taken" 2>/dev/null || true
+  MODE="idle-only"
+fi
+
 necro_hr
 necro_say "Necromancer reboot prep"
 necro_log_event "reboot_prep" "start" "mode=$MODE" "enrich=$ENRICH" "dry_run=$DRY_RUN"
@@ -68,8 +82,9 @@ necro_hr
 necro_say "Phase 1: necro-snapshot.sh"
 snap_flags=()
 case "$MODE" in
-  idle-only) snap_flags+=(--idle-only) ;;
-  yes)       snap_flags+=(--yes) ;;
+  idle-only)   snap_flags+=(--idle-only) ;;
+  interactive) snap_flags+=(--interactive) ;;
+  yes)         snap_flags+=(--yes) ;;
 esac
 if (( DRY_RUN )); then
   necro_say "DRY-RUN: would run necro-snapshot.sh ${snap_flags[*]}"
