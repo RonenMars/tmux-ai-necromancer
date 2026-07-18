@@ -43,6 +43,30 @@ necro_agent_for_cmd() {
   return 0
 }
 
+# Echo the agent name if an agent process is still alive among the pane's child
+# processes, "" otherwise. Unlike pane_current_command (the tty foreground pgrp
+# leader), this sees the agent even when it is SUSPENDED — e.g. codex honors
+# Ctrl-Z and stops (state T), which flips pane_current_command to the shell
+# while the codex process is still very much alive as a pane child. The watcher
+# uses this to tell a suspend (agent alive, don't mark exited) from a real exit
+# (no agent child). Same pgrep -P pane_pid probe the *_scrape_ps_resume
+# adapters already use.
+necro_agent_alive_in_pane() {
+  local pane="$1" pane_pid child ccmd agent
+  pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"
+  [ -n "$pane_pid" ] || return 0
+  for child in $(pgrep -P "$pane_pid" 2>/dev/null); do
+    ccmd="$(ps -o comm= -p "$child" 2>/dev/null)"
+    ccmd="${ccmd##*/}"  # basename — ps may print a full path
+    agent="$(necro_agent_for_cmd "$ccmd")"
+    if [ -n "$agent" ]; then
+      printf '%s' "$agent"
+      return 0
+    fi
+  done
+  return 0
+}
+
 # --- Per-cwd UUID cursor ----------------------------------------------------
 # File-based cursor so state survives subshell boundaries (command substitution
 # forks a subshell; writes to an in-memory array would be lost on return).
