@@ -71,6 +71,18 @@ case "$1" in
     fi
     exit 0
     ;;
+  show-options)
+    # -p -t <pane> — batched pane option read. $2=-p $3=-t $4=<pane>
+    pane="$4"
+    for opt in @necro_uuid @necro_cmd @necro_agent @necro_agent_exited @necro_pane_first_seen; do
+      line="$(grep -F "$pane|$opt=" "$STATE" 2>/dev/null | tail -1)"
+      if [ -n "$line" ]; then
+        val="${line#*=}"
+        [ -n "$val" ] && printf '%s %s\n' "$opt" "$val"
+      fi
+    done
+    exit 0
+    ;;
   set-option)
     # -gq <opt> <val>            (global)
     # -p -t <pane> <opt> <val>   (per-pane set)

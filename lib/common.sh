@@ -30,12 +30,100 @@ SCRIPTS_DIR="$PLUGIN_ROOT/scripts"
 unset _necro_common_src _necro_dir
 
 # --- tmux option helpers ----------------------------------------------------
+# Global options are read via a single batched `tmux show-options -g` call,
+# cached for the life of the process, instead of one `tmux show-option`
+# subprocess per lookup. A script like necro-watch.sh reads 5-8 global options
+# per invocation and status-right can invoke it dozens of times per second
+# across several attached clients; forking a `tmux show-option` per read
+# multiplies that into hundreds of processes for the exact same data. The
+# cache is a newline-delimited "name<TAB>value" blob parsed once with a shell
+# loop (no bash-4 assoc arrays — invariant 13).
+_NECRO_TMUX_OPTS_G_CACHE=""
+_NECRO_TMUX_OPTS_G_LOADED=""
+
+_necro_load_tmux_options_g() {
+  [ -n "$_NECRO_TMUX_OPTS_G_LOADED" ] && return 0
+  _NECRO_TMUX_OPTS_G_LOADED=1
+  local line name value
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    name="${line%% *}"
+    value="${line#* }"
+    # tmux quotes values containing spaces; strip one layer of matching quotes.
+    case "$value" in
+      \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    esac
+    _NECRO_TMUX_OPTS_G_CACHE="$_NECRO_TMUX_OPTS_G_CACHE
+$name	$value"
+  done < <(tmux show-options -g 2>/dev/null)
+}
+
 # Read a global tmux option, falling back to a default. Safe when no server.
 necro_tmux_option() {
   local option="$1" default="${2:-}"
-  local val
-  val="$(tmux show-option -gqv "$option" 2>/dev/null)" || true
-  printf '%s' "${val:-$default}"
+  _necro_load_tmux_options_g
+  local line val found=""
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      "$option"$'\t'*)
+        val="${line#*$'\t'}"
+        found=1
+        break
+        ;;
+    esac
+  done <<< "$_NECRO_TMUX_OPTS_G_CACHE"
+  if [ -n "$found" ]; then
+    printf '%s' "${val:-$default}"
+  else
+    printf '%s' "$default"
+  fi
+}
+
+# --- Pane-scoped tmux option helpers -----------------------------------------
+# necro-watch.sh reads 4-5 @necro_* options per pane, every pane, every tick.
+# One `tmux show-options -p -t <pane>` call replaces 4-5 `tmux show-option`
+# subprocesses for that pane. The cache is scoped to the current pane only
+# (set via necro_load_tmux_options_p before reading); a script walking many
+# panes calls it once per pane, right before reading that pane's options.
+_NECRO_TMUX_OPTS_P_CACHE=""
+
+necro_load_tmux_options_p() {
+  local pane_id="$1"
+  _NECRO_TMUX_OPTS_P_CACHE=""
+  local line name value
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    name="${line%% *}"
+    value="${line#* }"
+    case "$value" in
+      \"*\") value="${value#\"}"; value="${value%\"}" ;;
+    esac
+    _NECRO_TMUX_OPTS_P_CACHE="$_NECRO_TMUX_OPTS_P_CACHE
+$name	$value"
+  done < <(tmux show-options -p -t "$pane_id" 2>/dev/null)
+}
+
+# Read a pane-scoped option from the cache loaded by necro_load_tmux_options_p.
+# Caller must load the pane's cache first; this never shells out itself.
+necro_tmux_option_p() {
+  local option="$1" default="${2:-}"
+  local line val found=""
+  while IFS= read -r line; do
+    [ -n "$line" ] || continue
+    case "$line" in
+      "$option"$'\t'*)
+        val="${line#*$'\t'}"
+        found=1
+        break
+        ;;
+    esac
+  done <<< "$_NECRO_TMUX_OPTS_P_CACHE"
+  if [ -n "$found" ]; then
+    printf '%s' "${val:-$default}"
+  else
+    printf '%s' "$default"
+  fi
 }
 
 # --- Snapshot dir -----------------------------------------------------------
