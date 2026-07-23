@@ -22,23 +22,32 @@ necro_init_log "$0"
 necro_load_agents
 
 # --- Flags ------------------------------------------------------------------
-# --idle-only : never send exit keys to a live agent; capture via fallback only.
-#               (Used by autosave — zero pane disruption.)
-# --yes/-y    : auto-answer 'y' to every per-agent exit prompt.
-IDLE_ONLY=0
+# --idle-only   : never send exit keys to a live agent; capture via fallback only.
+#                 (Used by autosave — zero pane disruption.) DEFAULT.
+# --interactive : prompt per live agent before sending exit keys. Requires a tty.
+# --yes/-y      : auto-answer 'y' to every per-agent exit prompt. Requires a tty.
+IDLE_ONLY=1
+INTERACTIVE=0
 ASSUME_YES=0
+SAW_IDLE=0
+SAW_MODE_FLAG=0
 for arg in "$@"; do
   case "$arg" in
-    --idle-only) IDLE_ONLY=1 ;;
-    --yes|-y)    ASSUME_YES=1 ;;
+    --idle-only)   IDLE_ONLY=1; SAW_IDLE=1; SAW_MODE_FLAG=1 ;;
+    --interactive) INTERACTIVE=1; IDLE_ONLY=0; SAW_MODE_FLAG=1 ;;
+    --yes|-y)      ASSUME_YES=1; IDLE_ONLY=0; SAW_MODE_FLAG=1 ;;
     --help|-h)
       cat <<'H'
 necro-snapshot.sh — capture tmux AI-agent sessions to a JSONL snapshot.
 
 Usage:
-  necro-snapshot.sh                 walk panes, prompt per live agent, capture ids
-  necro-snapshot.sh --idle-only     record without disturbing any live agent
-  necro-snapshot.sh --yes           auto-exit every live agent and capture
+  necro-snapshot.sh                 idle-only (default): record without disturbing any live agent
+  necro-snapshot.sh --idle-only     same as bare invocation, explicit
+  necro-snapshot.sh --interactive   prompt per live agent before exiting it (needs a real tty)
+  necro-snapshot.sh --yes           auto-exit every live agent and capture (needs a real tty)
+
+Exit-capture (--interactive / --yes) requires a real controlling terminal.
+Without one, it is refused and downgraded to --idle-only automatically.
 
 Output: <snapshot-dir>/<timestamp>.jsonl (or .idle-only.jsonl)
 H
@@ -47,9 +56,23 @@ H
   esac
 done
 
-if (( IDLE_ONLY )) && (( ASSUME_YES )); then
-  necro_err "--idle-only and --yes are mutually exclusive."
+modes_set=0
+(( SAW_IDLE )) && modes_set=$((modes_set + 1))
+(( INTERACTIVE )) && modes_set=$((modes_set + 1))
+(( ASSUME_YES )) && modes_set=$((modes_set + 1))
+if (( modes_set > 1 )); then
+  necro_err "--idle-only, --interactive and --yes are mutually exclusive."
   exit 2
+fi
+
+# Exit-capture needs a real controlling terminal. NOTE: [ -r /dev/tty ] is NOT
+# sufficient — /dev/tty is 0666, so access(2) passes in cron/launchd/scripted
+# contexts where open(2) fails ENXIO. Attempt the actual open.
+if [ "$IDLE_ONLY" != "1" ] && ! { : </dev/tty; } 2>/dev/null; then
+  necro_warn "No controlling terminal — refusing exit-capture; downgrading to --idle-only."
+  necro_warn "No keys will be sent to any pane."
+  tmux display-message "necromancer: refused exit-capture (no tty) — idle-only snapshot taken" 2>/dev/null || true
+  IDLE_ONLY=1; INTERACTIVE=0; ASSUME_YES=0
 fi
 
 SNAP_DIR="$(necro_snapshot_dir)"
@@ -115,6 +138,7 @@ trap 'rm -rf "$NECRO_CURSOR_DIR"' EXIT
 export NECRO_CURSOR_DIR
 
 echo "Snapshot will be written to: $OUT"
+(( SAW_MODE_FLAG == 0 )) && echo "No mode flag given — defaulting to --idle-only. Pass --interactive to prompt per pane for exit-capture."
 echo
 
 snapshot=$(tmux list-panes -a -F \
@@ -178,7 +202,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout; do
     echo "  --yes: sending exit keys to $agent"; ans="y"
   else
     printf "  Exit this %s? [Y/n/s=skip/q=quit] " "$agent"
-    read -r ans </dev/tty || ans=""
+    read -r ans </dev/tty || ans="q"
   fi
   case "$ans" in
     q|Q) echo "  aborted by user"; break ;;
