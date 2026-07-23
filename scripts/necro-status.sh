@@ -33,10 +33,11 @@ while IFS=$'\t' read -r pane_id cmd; do
   if [ -n "$(necro_agent_for_cmd "$cmd")" ]; then
     active=$((active + 1))
   fi
-  if [ -n "$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)" ]; then
+  necro_load_tmux_options_p "$pane_id"
+  if [ -n "$(necro_tmux_option_p @necro_uuid)" ]; then
     tracked=$((tracked + 1))
   fi
-  if [ "$(tmux show-option -pqv -t "$pane_id" @necro_agent_exited 2>/dev/null || true)" = "1" ]; then
+  if [ "$(necro_tmux_option_p @necro_agent_exited)" = "1" ]; then
     exited=$((exited + 1))
   fi
 done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_command}' 2>/dev/null)
