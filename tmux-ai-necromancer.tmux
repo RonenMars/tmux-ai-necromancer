@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # tmux-ai-necromancer.tmux — TPM entrypoint.
 #
-# Loaded by tmux-plugins/tpm on tmux start. Wires the autosave trigger into
-# status-right (mirroring tmux-continuum) and binds a restore key.
+# Loaded by tmux-plugins/tpm on tmux start. Starts the autosave daemon,
+# optionally wires watcher/status segments into status-right, and binds restore.
 #
 # User-tunable options (set BEFORE the run-shell that sources tpm, in tmux.conf):
 #   @necromancer_interval        minutes between autosaves            (default 5)
@@ -12,6 +12,7 @@
 #   @necromancer_restore_key     prefix key to run restore            (default R)
 #   @necromancer_log_dir         where script logs live              (default ~/.tmux-ai-necromancer-logs)
 #   @necromancer_debug           write per-command debug logs        (default off)
+#   @necromancer_autosave_tick   daemon polling interval in seconds   (default 60)
 #   @necromancer_status          show status-right indicator          (default on)
 #   @necromancer_status_label    label for status-right indicator     (default necro)
 #   @necromancer_resume_delay      seconds to pause between resume batches (default 5)
@@ -36,23 +37,16 @@ set_default "@necromancer_claude_commands" "claude"
 set_default "@necromancer_restore_key"     "R"
 set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_debug"           "off"
+set_default "@necromancer_autosave_tick"   "60"
 set_default "@necromancer_status"          "on"
 set_default "@necromancer_status_label"    "necro"
 set_default "@necromancer_resume_delay"       "5"
 set_default "@necromancer_resume_batch_size"  "1"
 necro_log_event "plugin" "configure_defaults" "debug=$(necro_tmux_option @necromancer_debug off)"
 
-AUTOSAVE="$CURRENT_DIR/scripts/necro-autosave.sh"
-
-# Append the autosave trigger to status-right if not already present. tmux
-# evaluates #(...) on every status refresh; the script self-throttles to the
-# configured interval, so this is cheap.
-status_right="$(tmux show-option -gqv status-right 2>/dev/null)"
-case "$status_right" in
-  *necro-autosave.sh*) : ;;  # already wired
-  *) tmux set-option -gq status-right "#($AUTOSAVE)$status_right" ;;
-esac
-necro_log_event "plugin" "wire_autosave" "script=$AUTOSAVE"
+DAEMON="$CURRENT_DIR/scripts/necro-autosave-daemon.sh"
+tmux run-shell -b "$DAEMON"
+necro_log_event "plugin" "start_autosave_daemon" "script=$DAEMON"
 
 WATCHER="$CURRENT_DIR/scripts/necro-watch.sh"
 

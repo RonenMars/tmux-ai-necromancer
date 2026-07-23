@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# necro-autosave.sh — called from tmux status-right every status-interval seconds.
+# necro-autosave.sh — one-shot autosave job called by the daemon or manually.
 #
 # Checks whether @necromancer_interval minutes have elapsed since the last run
 # (stored as a tmux server option). If so, runs necro-snapshot.sh --idle-only
@@ -45,7 +45,7 @@ if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then
   exit 0
 fi
 
-# ponytail: mkdir is atomic — guarantees only one concurrent status-right fires
+# Atomic mkdir guarantees only one concurrent daemon tick or manual invocation.
 LOCK_DIR="$SNAP_DIR/.autosave.lock"
 mkdir "$LOCK_DIR" 2>/dev/null || { necro_log_event "autosave" "skip" "reason=lock_held"; exit 0; }
 necro_log_event "autosave" "start" "snapshot_dir=$SNAP_DIR"

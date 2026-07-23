@@ -47,7 +47,7 @@ Add to `~/.tmux.conf`:
 set -g @plugin 'RonenMars/tmux-ai-necromancer'
 ```
 
-Then press `prefix + I` to install. That's it — autosave starts immediately.
+Then press `prefix + I` to install. That's it — the autosave daemon starts immediately.
 
 ### Manual
 
@@ -126,6 +126,7 @@ set -g @necromancer_restore_key      'R'             # prefix key for restore po
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
+set -g @necromancer_autosave_tick   '60'            # daemon polling interval in seconds
 set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
 set -g @necromancer_status           'on'            # show status-right indicator
 set -g @necromancer_status_label     'necro'         # label for the indicator
@@ -181,8 +182,12 @@ mode is enabled; it never writes scrollback or transcript contents.
 
 ## How it works
 
-Like tmux-continuum, the plugin appends `#(...)` hooks to `status-right`. tmux
-evaluates those on every status refresh.
+The plugin starts one background autosave daemon with `tmux run-shell -b`.
+Autosave is therefore independent of `status-right` rendering and remains active
+when the visible status segment is disabled or replaced. The daemon polls every
+`@necromancer_autosave_tick` seconds (default 60), while the one-shot job
+self-throttles to `@necromancer_interval` minutes. An atomic daemon lock makes
+plugin reloads idempotent, and the daemon exits when the tmux server disappears.
 
 The visible status segment renders as `necro:<tracked>/<active>`, where
 `tracked` is panes with a pinned agent UUID and `active` is panes currently
@@ -195,7 +200,7 @@ exited flag so autosave can log the closed session.
 
 **Autosave** (`necro-autosave.sh`) self-throttles to your interval and, when due,
 runs a `--idle-only` snapshot in the background. An atomic `mkdir` lock prevents
-concurrent status-right evaluations from firing duplicate snapshots.
+concurrent daemon ticks or manual invocations from firing duplicate snapshots.
 
 A snapshot is JSON Lines, one record per pane:
 

@@ -3,7 +3,7 @@
 # not just the setup.
 #
 # necro-autosave.sh does its work in a backgrounded `{ ... } &` subshell while
-# the parent returns immediately (tmux status-right must not block). An EXIT
+# the parent returns immediately (the scheduler must not block). An EXIT
 # trap on the PARENT therefore releases the lock within milliseconds, leaving
 # the snapshot it is meant to serialize completely unprotected — measured at
 # 17ms of protection for 3000ms of work before this was fixed. The trap has to

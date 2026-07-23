@@ -6,7 +6,9 @@ your actual sessions — no test harness, no fake data.
 
 ## Capture the current state on command (no 15-min wait)
 
-The autosave interval runs exactly this every `@necromancer_interval` minutes:
+The autosave daemon runs the one-shot job every `@necromancer_autosave_tick`
+seconds; the job itself captures only when `@necromancer_interval` minutes have
+elapsed. To capture manually, run exactly this:
 
 ```bash
 scripts/necro-snapshot.sh --idle-only
