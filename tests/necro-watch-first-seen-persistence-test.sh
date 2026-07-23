@@ -43,6 +43,17 @@ case "$1" in
     if [ -n "$line" ]; then printf '%s\n' "${line#*=}"; fi
     exit 0
     ;;
+  show-options)
+    pane="$4"
+    for opt in @necro_uuid @necro_cmd @necro_agent @necro_agent_exited @necro_pane_first_seen; do
+      line="$(grep -F "$pane|$opt=" "$STATE" 2>/dev/null | tail -1)"
+      if [ -n "$line" ]; then
+        val="${line#*=}"
+        [ -n "$val" ] && printf '%s %s\n' "$opt" "$val"
+      fi
+    done
+    exit 0
+    ;;
   set-option)
     if [ "$2" = "-gq" ]; then exit 0; fi
     if [ "$2" = "-pu" ]; then

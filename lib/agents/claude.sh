@@ -13,8 +13,7 @@ CLAUDE_UUID_RE='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 agent_claude_matches() {
   local cmd="$1" name
   local cmds
-  cmds="$(tmux show-option -gqv @necromancer_claude_commands 2>/dev/null)"
-  cmds="${cmds:-claude}"
+  cmds="$(necro_tmux_option @necromancer_claude_commands claude)"
   for name in $cmds; do
     [ "$cmd" = "$name" ] && return 0
   done

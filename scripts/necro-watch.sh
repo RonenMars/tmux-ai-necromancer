@@ -72,10 +72,11 @@ NECRO_CURSOR_DIR="$(necro_watch_cursor_dir)"
 while IFS=$'\t' read -r pane_id cmd cwd; do
   [ -z "$pane_id" ] && continue
 
-  pinned_uuid="$(tmux show-option -pqv -t "$pane_id" @necro_uuid          2>/dev/null || true)"
-  pinned_cmd="$(tmux show-option  -pqv -t "$pane_id" @necro_cmd           2>/dev/null || true)"
-  pinned_agent="$(tmux show-option -pqv -t "$pane_id" @necro_agent        2>/dev/null || true)"
-  exited="$(tmux show-option      -pqv -t "$pane_id" @necro_agent_exited  2>/dev/null || true)"
+  necro_load_tmux_options_p "$pane_id"
+  pinned_uuid="$(necro_tmux_option_p @necro_uuid)"
+  pinned_cmd="$(necro_tmux_option_p @necro_cmd)"
+  pinned_agent="$(necro_tmux_option_p @necro_agent)"
+  exited="$(necro_tmux_option_p @necro_agent_exited)"
 
   agent="$(necro_agent_for_cmd "$cmd")"
 
@@ -104,7 +105,7 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
     # First-seen stamp: closest proxy tmux offers for pane creation time.
     # Written before the cursor-pop fallback so that fallback can reject
     # transcripts older than this pane.
-    first_seen="$(tmux show-option -pqv -t "$pane_id" @necro_pane_first_seen 2>/dev/null || true)"
+    first_seen="$(necro_tmux_option_p @necro_pane_first_seen)"
     if [ -z "$first_seen" ]; then
       first_seen="$now"
       tmux set-option -p -t "$pane_id" @necro_pane_first_seen "$first_seen" 2>/dev/null || true

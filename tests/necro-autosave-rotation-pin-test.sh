@@ -19,6 +19,11 @@ mkdir -p "$TMPBIN"
 cat > "$TMPBIN/tmux" <<'EOF'
 #!/usr/bin/env bash
 case "$*" in
+  *"show-options -g"*)
+    printf '@necromancer_interval 0\n'
+    printf '@necromancer_last_saved 0\n'
+    printf '@necromancer_max_snapshots 2\n'
+    ;;
   *"@necromancer_interval"*)      echo "0"  ;;
   *"@necromancer_last_saved"*)    echo "0"  ;;
   *"@necromancer_max_snapshots"*) echo "2"  ;;
