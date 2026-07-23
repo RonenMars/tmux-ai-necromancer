@@ -127,6 +127,17 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
 
   # ── Case 3: agent exited (had @necro_cmd set, current cmd no longer matches) ─
   if [ -n "$pinned_cmd" ] && [ -z "$agent" ] && [ "$exited" != "1" ]; then
+    # pane_current_command follows the tty foreground pgrp leader, which flips
+    # to the shell when the agent is merely SUSPENDED (codex honors Ctrl-Z and
+    # stops; claude ignores it). Marking such a pane "exited" is wrong: the next
+    # tick's Case 1 would wipe the pin AND @necro_pane_first_seen, and the reset
+    # (later) first_seen then makes cursor-pop reject the pane's own transcript
+    # via the min_epoch filter — permanently losing the UUID for a fresh
+    # (non-resumed) session. So only treat it as exited when no agent process
+    # survives among the pane's children; a suspended agent is still there.
+    if [ -n "$(necro_agent_alive_in_pane "$pane_id")" ]; then
+      continue
+    fi
     necro_log_event "watch" "agent_exit" "pane=$pane_id" "agent=${pinned_agent:-$pinned_cmd}"
     # Use the stored adapter name for scraping (not the raw command name).
     scrape_agent="${pinned_agent:-$pinned_cmd}"

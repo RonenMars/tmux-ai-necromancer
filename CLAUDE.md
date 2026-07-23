@@ -194,6 +194,7 @@ bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects 
 bash tests/necro-watch-priority-order-test.sh     # argv > scrollback > cursor-pop, end-to-end
 bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp doesn't drift across ticks
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
+bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit
 bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
