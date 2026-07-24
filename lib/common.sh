@@ -132,7 +132,10 @@ necro_tmux_option_p() {
 # and the dotfiles history remain readable after migration.
 necro_snapshot_dir() {
   if [ -n "${NECROMANCER_SNAPSHOT_DIR:-}" ]; then
-    printf '%s' "$NECROMANCER_SNAPSHOT_DIR"
+    case "$NECROMANCER_SNAPSHOT_DIR" in
+      "\\~"|"\\~/"*) printf '%s%s' "$HOME" "${NECROMANCER_SNAPSHOT_DIR#\\~}" ;;
+      *) printf '%s' "$NECROMANCER_SNAPSHOT_DIR" ;;
+    esac
     return
   fi
   local opt
@@ -141,6 +144,7 @@ necro_snapshot_dir() {
     # Expand a leading ~ since tmux options store it literally.
     case "$opt" in
       "~"|"~/"*) opt="$HOME${opt#\~}" ;;
+      "\\~"|"\\~/"*) opt="$HOME${opt#\\~}" ;;
     esac
     printf '%s' "$opt"
     return
@@ -152,7 +156,10 @@ necro_snapshot_dir() {
 # Precedence: explicit env var > tmux option > default local dir.
 necro_log_dir() {
   if [ -n "${NECROMANCER_LOG_DIR:-}" ]; then
-    printf '%s' "$NECROMANCER_LOG_DIR"
+    case "$NECROMANCER_LOG_DIR" in
+      "\\~"|"\\~/"*) printf '%s%s' "$HOME" "${NECROMANCER_LOG_DIR#\\~}" ;;
+      *) printf '%s' "$NECROMANCER_LOG_DIR" ;;
+    esac
     return
   fi
   local opt
@@ -160,6 +167,7 @@ necro_log_dir() {
   if [ -n "$opt" ]; then
     case "$opt" in
       "~"|"~/"*) opt="$HOME${opt#\~}" ;;
+      "\\~"|"\\~/"*) opt="$HOME${opt#\\~}" ;;
     esac
     printf '%s' "$opt"
     return
