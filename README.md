@@ -126,10 +126,9 @@ set -g @necromancer_restore_key      'R'             # prefix key for restore po
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
-set -g @necromancer_autosave_tick   '60'            # daemon polling interval in seconds
+set -g @necromancer_autosave_tick   '60'            # autosave daemon polling interval in seconds
+set -g @necromancer_watch_tick      '1'             # watcher daemon polling interval in seconds
 set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
-set -g @necromancer_status           'on'            # show status-right indicator
-set -g @necromancer_status_label     'necro'         # label for the indicator
 set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
@@ -182,18 +181,15 @@ mode is enabled; it never writes scrollback or transcript contents.
 
 ## How it works
 
-The plugin starts one background autosave daemon with `tmux run-shell -b`.
-Autosave is therefore independent of `status-right` rendering and remains active
-when the visible status segment is disabled or replaced. The daemon polls every
-`@necromancer_autosave_tick` seconds (default 60), while the one-shot job
-self-throttles to `@necromancer_interval` minutes. An atomic daemon lock makes
-plugin reloads idempotent, and the daemon exits when the tmux server disappears.
+The plugin starts independent autosave and watcher daemons with
+`tmux run-shell -b`; neither runs during `status-right` rendering. Autosave
+polls every `@necromancer_autosave_tick` seconds (default 60), while the
+one-shot job self-throttles to `@necromancer_interval` minutes (default 5).
+The watcher polls every `@necromancer_watch_tick` seconds (default 1). Atomic
+daemon locks make plugin reloads idempotent, and both daemons exit when the
+tmux server disappears.
 
-The visible status segment renders as `necro:<tracked>/<active>`, where
-`tracked` is panes with a pinned agent UUID and `active` is panes currently
-running a configured agent. If any tracked agents exited, it appends `+N`.
-
-**Pane watcher** (`necro-watch.sh`) runs every tick and maintains four tmux pane
+**Pane watcher** (`necro-watch.sh`) runs from the watcher daemon and maintains four tmux pane
 options: `@necro_uuid`, `@necro_agent`, `@necro_cmd`, and `@necro_agent_exited`.
 When an agent starts it pins the UUID immediately; when it exits it sets the
 exited flag so autosave can log the closed session.

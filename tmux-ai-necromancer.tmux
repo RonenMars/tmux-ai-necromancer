@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # tmux-ai-necromancer.tmux — TPM entrypoint.
 #
-# Loaded by tmux-plugins/tpm on tmux start. Starts the autosave daemon,
-# optionally wires watcher/status segments into status-right, and binds restore.
+# Loaded by tmux-plugins/tpm on tmux start. Starts the autosave and watcher
+# daemons, removes legacy status-right hooks, and binds restore.
 #
 # User-tunable options (set BEFORE the run-shell that sources tpm, in tmux.conf):
 #   @necromancer_interval        minutes between autosaves            (default 5)
@@ -13,8 +13,7 @@
 #   @necromancer_log_dir         where script logs live              (default ~/.tmux-ai-necromancer-logs)
 #   @necromancer_debug           write per-command debug logs        (default off)
 #   @necromancer_autosave_tick   daemon polling interval in seconds   (default 60)
-#   @necromancer_status          show status-right indicator          (default on)
-#   @necromancer_status_label    label for status-right indicator     (default necro)
+#   @necromancer_watch_tick      watcher polling interval in seconds  (default 1)
 #   @necromancer_resume_delay      seconds to pause between resume batches (default 5)
 #   @necromancer_resume_batch_size resumes launched per batch before pausing (default 1)
 
@@ -38,8 +37,7 @@ set_default "@necromancer_restore_key"     "R"
 set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_debug"           "off"
 set_default "@necromancer_autosave_tick"   "60"
-set_default "@necromancer_status"          "on"
-set_default "@necromancer_status_label"    "necro"
+set_default "@necromancer_watch_tick"      "1"
 set_default "@necromancer_resume_delay"       "5"
 set_default "@necromancer_resume_batch_size"  "1"
 necro_log_event "plugin" "configure_defaults" "debug=$(necro_tmux_option @necromancer_debug off)"
@@ -48,23 +46,19 @@ DAEMON="$CURRENT_DIR/scripts/necro-autosave-daemon.sh"
 tmux run-shell -b "$DAEMON"
 necro_log_event "plugin" "start_autosave_daemon" "script=$DAEMON"
 
-WATCHER="$CURRENT_DIR/scripts/necro-watch.sh"
+WATCH_DAEMON="$CURRENT_DIR/scripts/necro-watch-daemon.sh"
+tmux run-shell -b "$WATCH_DAEMON"
+necro_log_event "plugin" "start_watch_daemon" "script=$WATCH_DAEMON"
 
+# Remove hooks installed by older plugin versions. Both watcher and status are
+# now scheduled by background daemons, so they must not run during status-bar
+# rendering. The autosave hook is removed too because its daemon is independent.
 status_right="$(tmux show-option -gqv status-right 2>/dev/null)"
-case "$status_right" in
-  *necro-watch.sh*) : ;;  # already wired
-  *) tmux set-option -gq status-right "#($WATCHER)$status_right" ;;
-esac
-necro_log_event "plugin" "wire_watcher" "script=$WATCHER"
-
-STATUS="$CURRENT_DIR/scripts/necro-status.sh"
-
-status_right="$(tmux show-option -gqv status-right 2>/dev/null)"
-case "$status_right" in
-  *necro-status.sh*) : ;;  # already wired
-  *) tmux set-option -gq status-right "#($STATUS)$status_right" ;;
-esac
-necro_log_event "plugin" "wire_status" "script=$STATUS"
+clean_status_right="$(printf '%s' "$status_right" | sed -E 's@#[(][^)]*/necro-(status|watch|autosave)[.]sh[)]@@g')"
+if [ "$clean_status_right" != "$status_right" ]; then
+  tmux set-option -gq status-right "$clean_status_right"
+  necro_log_event "plugin" "remove_legacy_status_hooks"
+fi
 
 # Bind <prefix> <restore_key> to the restore script in a popup.
 restore_key="$(tmux show-option -gqv @necromancer_restore_key 2>/dev/null)"

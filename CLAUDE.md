@@ -11,11 +11,13 @@ or reboot. Pure bash + a small Go TUI. No build step for the plugin itself.
 ## Architecture (read before editing)
 
 ```
-tmux-ai-necromancer.tmux   TPM entrypoint — wires autosave + watcher into status-right, binds restore key
+tmux-ai-necromancer.tmux   TPM entrypoint — starts autosave + watcher daemons, binds restore key
 scripts/                   the executables (all source lib/*.sh)
   necro-snapshot.sh        walk panes → JSONL snapshot (per-agent id capture)
-  necro-autosave.sh        status-right hook; throttled background snapshot + rotation
-  necro-watch.sh           status-right hook; per-tick pane watcher — pins @necro_uuid/@necro_agent to panes
+  necro-autosave.sh        one-shot throttled background snapshot + rotation
+  necro-autosave-daemon.sh autosave scheduler, independent of status-right
+  necro-watch.sh           one-tick pane watcher — pins @necro_uuid/@necro_agent to panes
+  necro-watch-daemon.sh    watcher scheduler, independent of status-right
   necro-restore.sh         rebuild sessions/windows from a snapshot (IDEMPOTENT)
   necro-apply.sh           reorganize LIVE panes into dest sessions + resume
   necro-context.sh         enrich a snapshot with conversation previews

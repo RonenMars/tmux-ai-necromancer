@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# necro-autosave-daemon-wiring-test.sh — the entrypoint must start autosave
-# independently and never reintroduce the autosave #(...) status hook.
+# necro-autosave-daemon-wiring-test.sh — the entrypoint must start both
+# schedulers independently and never wire necromancer scripts into status-right.
 set -uo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -19,7 +19,7 @@ printf '%s\n' "$*" >> "${CALLS:?}"
 case "$1" in
   show-option)
     case "${3:-}" in
-      status-right) printf 'BASE' ;;
+      status-right) printf '#(/Users/ronenmars/.tmux/plugins/tmux-ai-necromancer/scripts/necro-status.sh)#(/Users/ronenmars/.tmux/plugins/tmux-ai-necromancer/scripts/necro-watch.sh)BASE' ;;
       @necromancer_debug) printf 'off' ;;
       @necromancer_restore_key) printf 'R' ;;
       *) printf '' ;;
@@ -38,9 +38,17 @@ grep -F "run-shell -b $ROOT/scripts/necro-autosave-daemon.sh" "$CALLS" >/dev/nul
   echo 'FAIL: entrypoint did not start autosave daemon' >&2
   exit 1
 }
-if grep -E 'set-option .*status-right .*necro-autosave\.sh' "$CALLS" >/dev/null; then
-  echo 'FAIL: autosave was wired back into status-right' >&2
+grep -F "run-shell -b $ROOT/scripts/necro-watch-daemon.sh" "$CALLS" >/dev/null || {
+  echo 'FAIL: entrypoint did not start watcher daemon' >&2
+  exit 1
+}
+if grep -E 'set-option .*status-right .*necro-(status|watch|autosave)\.sh' "$CALLS" >/dev/null; then
+  echo 'FAIL: necromancer script was wired into status-right' >&2
   exit 1
 fi
+grep -F 'set-option -gq status-right BASE' "$CALLS" >/dev/null || {
+  echo 'FAIL: legacy status-right hooks were not removed' >&2
+  exit 1
+}
 
-echo 'PASS: autosave daemon wiring is independent of status-right'
+echo 'PASS: autosave and watcher daemons are independent of status-right'

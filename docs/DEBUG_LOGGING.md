@@ -24,17 +24,16 @@ directory. `autosave.log` remains in the snapshot directory, which defaults to
 
 ## Approximate daily growth
 
-The estimate below assumes a 10-second tmux status interval, a 15-minute
-autosave interval, and debug mode enabled. It excludes the TUI, whose usage
+The estimate below assumes a 1-second watcher tick, a 5-minute autosave
+interval, and debug mode enabled. It excludes the TUI, whose usage
 depends on how actively it is used.
 
 | Log source | Approximate daily growth | What drives it |
 | --- | ---: | --- |
-| Pane watcher | ~3.5 MB | One structured pass per status refresh |
-| Autosave | ~2.5–3 MB | Snapshot eligibility and save events every 15 minutes |
-| Status helper | ~1.5–2 MB | Status rendering every 10 seconds |
+| Pane watcher | ~3.5 MB | One structured pass per watcher tick |
+| Autosave | ~2.5–3 MB | Snapshot eligibility and save events every 5 minutes |
 | Snapshot and autosave summary | ~0.3 MB | Snapshot completion and summary records |
-| **Total, without TUI** | **~8–10 MB/day** | Typical active tmux usage |
+| **Total, without TUI** | **~6–7 MB/day** | Typical active tmux usage |
 
 At that rate, leaving debug mode on without cleanup would use roughly
 250–300 MB per month. The logs use disk space and a small amount of additional
