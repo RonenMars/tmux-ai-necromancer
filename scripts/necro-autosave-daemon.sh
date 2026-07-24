@@ -32,6 +32,7 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
       exit 0
       ;;
     *)
+      rm -f "$LOCK_DIR/pid"
       rmdir "$LOCK_DIR" 2>/dev/null || {
         necro_log_event "daemon" "skip" "reason=lock_held"
         exit 0
