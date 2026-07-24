@@ -4,7 +4,7 @@
 
 **Goal:** Add a per-tick pane watcher that pins a UUID to each agent pane the moment it's detected, so autosave no longer relies on mtime-ordering heuristics for multi-session cwds.
 
-**Architecture:** A new `necro-watch.sh` runs every status-interval (5s) via `status-right`. It walks panes, pins `@necro_uuid` + `@necro_cmd` on newly-detected agent panes, detects exits (command changed away from agent), and scrapes the farewell UUID from scrollback on exit. `necro-snapshot.sh` reads `@necro_uuid` first and only falls back to the cursor when unset. `agent_<name>_matches` is extended to accept a configurable command list so aliases like `cc` work.
+**Architecture:** A new `necro-watch.sh` runs every watcher-daemon tick. It walks panes, pins `@necro_uuid` + `@necro_cmd` on newly-detected agent panes, detects exits (command changed away from agent), and scrapes the farewell UUID from scrollback on exit. `necro-snapshot.sh` reads `@necro_uuid` first and only falls back to the cursor when unset. `agent_<name>_matches` is extended to accept a configurable command list so aliases like `cc` work.
 
 **Tech Stack:** bash, tmux pane/window options, existing `lib/agents.sh` + `lib/common.sh`
 
@@ -157,7 +157,7 @@ Cursor dir for `necro_agent_pop_session_id` must persist across watcher ticks (u
 
 **Files:**
 - Create: `scripts/necro-watch.sh`
-- Modify: `tmux-ai-necromancer.tmux` (wire into status-right)
+- Modify: `tmux-ai-necromancer.tmux` (start watcher daemon)
 - Modify: `lib/agents.sh` (expose persistent cursor dir path helper)
 
 **Interfaces:**
@@ -184,7 +184,7 @@ necro_watch_cursor_dir() {
 #!/usr/bin/env bash
 # necro-watch.sh — per-tick pane watcher; pins @necro_uuid on agent panes.
 #
-# Runs every status-interval seconds via status-right. Self-throttles to
+# Runs every watcher-daemon tick. Self-throttles to
 # avoid running more than once per second. Zero pane disruption.
 #
 # Pane options set:
@@ -273,7 +273,7 @@ exit 0
 chmod +x scripts/necro-watch.sh
 ```
 
-- [ ] **Step 4: Wire into `status-right` in `tmux-ai-necromancer.tmux`**
+- [ ] **Step 4: Start the watcher daemon in `tmux-ai-necromancer.tmux`**
 
 After the existing autosave wiring block, add:
 

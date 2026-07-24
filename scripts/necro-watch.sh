@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # necro-watch.sh — per-tick pane watcher; pins @necro_uuid on agent panes.
 #
-# Runs every status-interval seconds via status-right. Self-throttles to
+# Runs once per watcher-daemon tick. Self-throttles to
 # avoid running more than once per second. Zero pane disruption.
 #
 # Pane options set:

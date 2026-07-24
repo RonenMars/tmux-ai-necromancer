@@ -72,8 +72,8 @@ most sessions were already gone. See **Sessions missing after reboot** above.
 **Other causes to rule out:**
 - `@necromancer_agents` tmux option doesn't include your agent
   (`tmux show-option -gv @necromancer_agents`)
-- Watcher (`necro-watch.sh`) isn't hooked into `status-right` — check
-  `tmux show-option -gv status-right`
+- Watcher daemon is not running — check
+  `pgrep -af necro-watch-daemon.sh`
 - Sessions use a different shell command than registered adapters recognize
   (`necro_agent_for_cmd` in `lib/agents.sh`)
 
@@ -85,7 +85,7 @@ This is expected. Restore is keyed on a stable per-window marker
 (`@necro_id`). If the windows already exist from a previous restore run,
 they are reused — no duplicates, no extra agents launched.
 
-## New restore and status controls
+## New restore controls
 
 - Claude resumes are skipped when the transcript is too large; pass
   `--force-large` or raise `@necromancer_max_claude_transcript_bytes` if that
@@ -93,9 +93,6 @@ they are reused — no duplicates, no extra agents launched.
 - Restore skips unsafe debug cwd paths such as `/private/tmp/claude-*`,
   `*tmux-debug-build*`, and `*crashtest*`; pass `--allow-unsafe-cwd` only if
   you know the snapshot is safe.
-- The tmux status indicator is `necro:<tracked>/<active>`; disable it with
-  `set -g @necromancer_status 'off'` if you do not want the extra segment.
-
 ## Debug logs
 
 - Enable tracing with `set -g @necromancer_debug 'on'` (or
