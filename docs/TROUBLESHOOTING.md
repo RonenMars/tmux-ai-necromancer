@@ -104,9 +104,12 @@ at once:
   released by a trap; if that run is killed the lock would survive and every
   later tick exit silently, with the daemon still reporting as running.
   Autosave now recovers this itself — the run stamps its pid inside the lock
-  and a later run reclaims it once that pid is gone — so it should heal within
-  one tick. `necro-doctor.sh` still reports a lock held over 10 minutes; if you
-  ever see one persist, clear it with
+  and a later run reclaims it once that pid is gone. Recovery happens on the
+  next *due* autosave, not the next daemon tick: the interval throttle returns
+  first, so healing takes up to one `@necromancer_interval` (5 minutes by
+  default), not one `@necromancer_autosave_tick`.
+  `necro-doctor.sh` still reports a lock held over 10 minutes; if you
+  ever see one persist beyond that, clear it with
   `rmdir "$(tmux show-option -gv @necromancer_snapshot_dir)/.autosave.lock"`
   and please file a bug, because the recovery should have handled it.
 - Sessions use a different shell command than registered adapters recognize

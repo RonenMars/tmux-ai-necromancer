@@ -9,6 +9,10 @@ trap 'rm -rf "$TMP"' EXIT
 # Isolated snapshot dir — no live tmux or real snapshot dir needed.
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
 export NECROMANCER_DEBUG=1
+# Keep debug output inside the tmpdir. Without this the suite writes its
+# events into the user's real ~/.tmux-ai-necromancer-logs, where they are
+# indistinguishable from live daemon activity when reading a log.
+export NECROMANCER_LOG_DIR="$TMP/logs"
 mkdir -p "$NECROMANCER_SNAPSHOT_DIR"
 
 # Stub bin dir prepended to PATH.
