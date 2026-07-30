@@ -17,6 +17,7 @@
 #   @necromancer_resume_delay      seconds to pause between resume batches (default 5)
 #   @necromancer_resume_batch_size resumes launched per batch before pausing (default 1)
 #   @necromancer_claude_commands   command names that mean Claude Code    (default "claude")
+#   @necromancer_codex_commands    command names that mean Codex   (default "codex codex-*")
 #
 # Read by the scripts themselves, not defaulted here (in-code fallbacks):
 #   @necromancer_resume_message       text sent into a pane after resume (default "continue")
@@ -40,6 +41,7 @@ set_default "@necromancer_interval"        "5"
 set_default "@necromancer_max_snapshots"   "20"
 set_default "@necromancer_agents"          "claude codex"
 set_default "@necromancer_claude_commands" "claude"
+set_default "@necromancer_codex_commands"  "codex codex-*"
 set_default "@necromancer_restore_key"     "R"
 set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_debug"           "off"

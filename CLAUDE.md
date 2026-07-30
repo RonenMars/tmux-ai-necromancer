@@ -240,7 +240,8 @@ bash tests/necro-restore-layout-test.sh           # restore replays window_layou
 bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)
 bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume message too
 bash tests/necro-restore-bash32-test.sh           # restore runs clean under stock /bin/bash 3.2 (no declare -A)
-bash tests/necro-agent-codex-matches-test.sh      # codex matches the truncated native binary name
+bash tests/necro-agent-codex-matches-test.sh      # @necromancer_codex_commands globs; default still matches the truncated native binary
+bash tests/necro-agent-claude-matches-test.sh     # @necromancer_claude_commands globs; a plain name stays an exact match
 bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
 bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot

@@ -171,6 +171,7 @@ set -g @necromancer_debug           'off'           # write per-command debug lo
 set -g @necromancer_autosave_tick   '60'            # autosave daemon polling interval in seconds
 set -g @necromancer_watch_tick      '1'             # watcher daemon polling interval in seconds
 set -g @necromancer_claude_commands  'claude'        # space-separated command names for Claude Code (add aliases, e.g. 'claude cc')
+set -g @necromancer_codex_commands   'codex codex-*' # same, for Codex; entries are globs (the default covers the truncated native binary)
 set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
