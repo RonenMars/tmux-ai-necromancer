@@ -76,6 +76,7 @@ run-shell ~/.tmux/plugins/tmux-ai-necromancer/tmux-ai-necromancer.tmux  # in tmu
 | Before reboot | `necro-reboot-prep.sh` (or `safe-reboot` / `safe-shutdown` aliases) |
 | After reboot | `necro-reboot-resume.sh` |
 | Prune idle-shell windows | `necro-prune.sh` (`--dry-run` to preview) |
+| Reorganize LIVE panes into sessions | `necro-apply.sh <file.jsonl>` (see note below) |
 | Interactive menu | `necro-menu.sh` |
 | Session viewer | `make -C tui run` |
 
@@ -86,6 +87,13 @@ ones you use.
 `necro-restore.sh` restores a snapshot you choose explicitly. `necro-reboot-resume.sh`
 is the reboot wrapper behind `necro-resume`; it finds the pinned reboot snapshot,
 ensures tmux is up, then calls restore for you.
+
+`necro-apply.sh` is different: it operates on **live** panes rather than
+rebuilding dead ones, moving each recorded pane's window into a destination
+session and resuming the agent in place. Use it to reorganize a sprawling
+server. Destination comes from the record's `dest_session`, else a routing
+table at the top of the script — that table ships with example globs and you
+will want to edit it for your own projects before using it.
 
 ### Recommended shell aliases
 
@@ -116,7 +124,11 @@ alias safe-shutdown='~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-reboot-pr
 
 ## Configuration
 
-Set these in `~/.tmux.conf` **before** the line that loads TPM:
+**All optional** — the plugin defaults every one of these itself, so the single
+`set -g @plugin` line from [Install](#with-tpm-recommended) is enough on its own.
+The values below are the defaults; pasting the block verbatim changes nothing.
+Override only what you want to change, in `~/.tmux.conf` **before** the line that
+loads TPM:
 
 ```tmux
 set -g @necromancer_interval         '5'             # minutes between autosaves
@@ -128,12 +140,34 @@ set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
 set -g @necromancer_autosave_tick   '60'            # autosave daemon polling interval in seconds
 set -g @necromancer_watch_tick      '1'             # watcher daemon polling interval in seconds
-set -g @necromancer_claude_commands  'claude cc'     # space-separated command names for Claude Code
+set -g @necromancer_claude_commands  'claude'        # space-separated command names for Claude Code (add aliases, e.g. 'claude cc')
 set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
 set -g @necromancer_resume_message_delay '8'  # seconds to wait before sending that message
 ```
+
+Two more options govern restore safety —
+`@necromancer_max_claude_transcript_bytes` and `@necromancer_unsafe_cwd_patterns`.
+They're documented with their defaults in `necro-restore.sh --help` and under
+[Troubleshooting](docs/TROUBLESHOOTING.md).
+
+### Applying a config change later
+
+Editing `~/.tmux.conf` alone does nothing — tmux options only change when the
+file is re-read. How much you need to reload depends on the option:
+
+| Options | To apply |
+|---|---|
+| Everything except the two below | `tmux source-file ~/.tmux.conf` — scripts read these at each run |
+| `@necromancer_restore_key` | Same, then re-run the plugin file (`prefix + I`, or restart tmux). The old key stays bound until the server restarts. |
+| `@necromancer_autosave_tick`, `@necromancer_watch_tick` | The daemons read their tick once at startup and a re-source is a no-op while they hold their lock. Restart them: `pkill -9 -f 'necro-.*-daemon\.sh'; tmux source-file ~/.tmux.conf` |
+
+`-9` is deliberate in that last one. On a plain `TERM` the daemon's cleanup trap
+is deferred until its in-flight `sleep` returns (up to a full tick), so the lock
+is still held when you re-source and no new daemon starts. `SIGKILL` leaves a
+stale lock instead, which the next daemon detects (the recorded pid no longer
+matches a daemon process) and reclaims immediately.
 
 `@necromancer_resume_delay` / `@necromancer_resume_batch_size` govern
 `necro-restore.sh` and `necro-apply.sh`: launching several `claude --resume`
@@ -189,30 +223,38 @@ The watcher polls every `@necromancer_watch_tick` seconds (default 1). Atomic
 daemon locks make plugin reloads idempotent, and both daemons exit when the
 tmux server disappears.
 
-**Pane watcher** (`necro-watch.sh`) runs from the watcher daemon and maintains four tmux pane
-options: `@necro_uuid`, `@necro_agent`, `@necro_cmd`, and `@necro_agent_exited`.
-When an agent starts it pins the UUID immediately; when it exits it sets the
-exited flag so autosave can log the closed session.
+**Pane watcher** (`necro-watch.sh`) runs from the watcher daemon and maintains five tmux pane
+options: `@necro_uuid`, `@necro_agent`, `@necro_cmd`, `@necro_agent_exited`, and
+`@necro_pane_first_seen`. When an agent starts it pins the UUID immediately; when
+it exits it sets the exited flag so autosave can log the closed session. The
+first-seen stamp records when the pane's agent was first observed, so the
+filesystem fallback can reject transcripts older than the pane itself.
 
 **Autosave** (`necro-autosave.sh`) self-throttles to your interval and, when due,
 runs a `--idle-only` snapshot in the background. An atomic `mkdir` lock prevents
 concurrent daemon ticks or manual invocations from firing duplicate snapshots.
+It also skips entirely during the first 90 seconds of machine uptime, so a
+snapshot of a half-restored server can't overwrite the good one before
+`necro-reboot-resume.sh` has had a chance to run.
 
 A snapshot is JSON Lines, one record per pane:
 
 ```json
 {"pane_id":"%5","session":"tb-mobile","window_index":3,"window_name":"feat:x",
  "cwd":"/Users/you/dev/app","prev_cmd":"claude","agent":"claude",
- "uuid":"abc-…","uuid_source":"pane-option","captured_at":"…",
+ "uuid":"abc-…","uuid_source":"pane-option","window_layout":"c005,364x71,0,0{…}",
+ "captured_at":"…",
  "first_user":"","last_assistant":"","dest_session":"","dest_window_name":""}
 ```
 
-`uuid_source` is `"pane-option"` when the watcher already pinned the UUID, or
+`uuid_source` is `"pane-option"` when the watcher already pinned the UUID,
 `"latest-jsonl"` for the filesystem fallback (most-recent transcript for the
-pane's cwd). The watcher path is preferred — it's exact and collision-free even
-when multiple agents share the same working directory.
+pane's cwd), `"scrollback"` when an interactive capture scraped it from the
+pane, or `""` when no id could be found at all. The watcher path is preferred —
+it's exact and collision-free even when multiple agents share the same working
+directory.
 
-Restore is keyed on a stable per-window marker (`@necro_id`), not window names
+Restore is keyed on a stable per-pane marker (`@necro_id`), not window names
 (which auto-rename) — so repeated restores never stack duplicates.
 
 ## Supported agents

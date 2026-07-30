@@ -4,7 +4,8 @@
 # Sources every adapter in lib/agents/ and provides a uniform front-end so the
 # scripts never hardcode a specific agent. Adding an agent = drop a new file in
 # lib/agents/<name>.sh implementing the contract (see docs/agents.md) and add
-# its name to the default @necromancer_agents list (or it's auto-discovered).
+# its name to @necromancer_agents. Only listed agents are sourced — an adapter
+# file that isn't named in that option is never loaded.
 #
 # Requires lib/common.sh to be sourced first (for LIB_DIR + necro_tmux_option).
 

@@ -3,6 +3,8 @@
 Date: 2026-07-16
 Status: approved
 
+> **As-built note (2026-07).** Shipped as designed — default `continue`, default delay 8s, empty string disables at every tier, flag > env > tmux option > built-in.
+
 ## Goal
 
 After `necro-restore.sh` / `necro-apply.sh` send a `claude`/`codex --resume`

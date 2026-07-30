@@ -24,6 +24,10 @@ scripts/                   the executables (all source lib/*.sh)
   necro-reboot-prep.sh     pre-reboot: snapshot + enrich + resurrect save + pin pointer
   necro-reboot-resume.sh   post-reboot: ensure server up → necro-restore.sh
   necro-prune.sh           kill windows whose panes are all idle shells (no child procs)
+  necro-menu.sh            interactive menu: list/resume/cleanup snapshots, reboot prep
+  necro-log-divider.sh     stamp a labelled separator into every debug log
+  necro-clean-debug-logs.sh   remove debug logs (needs tmux)
+  necro-clean-debug-logs.py   same, standalone — no tmux/shell needed (Windows/Linux)
 lib/
   common.sh                PLUGIN_ROOT resolution, snapshot dir, logging, json escape
   agents.sh                adapter registry + dispatch
@@ -67,7 +71,8 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
 
    Multi-pane grouping: within a single restore run, the first record for a
    `(session, window_index)` creates/claims the window; later records with the
-   same key `split-window` into it (tracked via `WIN_FOR_GROUP`). This
+   same key `split-window` into it (tracked via the `group_get`/`group_set`
+   scalar map — see invariant 13 for why it isn't a `declare -A`). This
    reconstructs multi-pane windows instead of flattening each pane into its own
    window.
 
@@ -235,6 +240,18 @@ bash tests/necro-restore-layout-test.sh           # restore replays window_layou
 bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)
 bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume message too
 bash tests/necro-restore-bash32-test.sh           # restore runs clean under stock /bin/bash 3.2 (no declare -A)
+bash tests/necro-agent-codex-matches-test.sh      # codex matches the truncated native binary name
+bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
+bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
+bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot
+bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots
+bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events
+bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
+bash tests/necro-restore-claim-existing-test.sh   # restore claims unmarked resurrect-created panes
+bash tests/necro-restore-multipane-window-test.sh # multi-pane windows restore as splits, not flat windows
+bash tests/necro-restore-safety-test.sh           # restore skips oversized transcripts and unsafe cwds
+bash tests/necro-snapshot-idle-shell-test.sh      # idle shells trust only pane-local watcher state
+bash tests/necro-watch-daemon-lock-test.sh        # watcher daemon lock: one daemon per server
 ```
 
 For restore/snapshot changes, run against an **isolated tmux socket**:

@@ -4,7 +4,7 @@ Real-world exercises for a developer running multiple tmux sessions, windows,
 and panes with live AI agents (Claude Code / Codex). Run these by hand against
 your actual sessions — no test harness, no fake data.
 
-## Capture the current state on command (no 15-min wait)
+## Capture the current state on command (no 5-min wait)
 
 The autosave daemon runs the one-shot job every `@necromancer_autosave_tick`
 seconds; the job itself captures only when `@necromancer_interval` minutes have

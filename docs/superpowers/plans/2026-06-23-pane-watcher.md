@@ -8,6 +8,11 @@
 
 **Tech Stack:** bash, tmux pane/window options, existing `lib/agents.sh` + `lib/common.sh`
 
+> **As-built differs (2026-07).** This plan is a point-in-time record and is kept as written.
+> Two things changed after it shipped: UUID resolution gained a higher-priority first step, and the pane-option set grew.
+> Resolution order is now **process argv → scrollback → cursor-pop**, not scrollback → cursor-pop — see invariant 9 in `CLAUDE.md` and `agent_<name>_scrape_ps_resume`.
+> The watcher now maintains five pane options, adding `@necro_agent` and `@necro_pane_first_seen`; the latter is the stale-transcript floor passed to the cursor-pop fallback.
+
 ## Global Constraints
 
 - `set -uo pipefail` — NOT `set -euo`. Pipelines legitimately exit non-zero on no-match; guard with `|| true`.

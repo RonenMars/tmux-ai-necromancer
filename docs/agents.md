@@ -6,7 +6,7 @@ single file in `lib/agents/<name>.sh` plus adding `<name>` to
 
 ## The contract
 
-Implement these five functions, prefixed `agent_<name>_`:
+Implement these seven functions, prefixed `agent_<name>_`:
 
 ```bash
 # Is this pane's foreground command your agent?
@@ -69,8 +69,8 @@ after that time are candidates. The watcher passes the pane's
 `@necro_pane_first_seen` stamp (the closest proxy tmux offers for "when this
 pane was created" — tmux has no true creation timestamp) so a transcript from
 days/weeks before the pane existed is never eligible, no matter where it falls
-in the newest-mtime-first ordering. Adapters that don't implement this
-filtering (e.g. `codex.sh`) simply ignore the extra argument — it's optional,
+in the newest-mtime-first ordering. Both reference adapters implement it;
+an adapter that doesn't simply ignores the extra argument — it's optional,
 not part of the required contract.
 
 The two reference adapters show both shapes:

@@ -73,15 +73,29 @@ most sessions were already gone. See **Sessions missing after reboot** above.
 - `@necromancer_agents` tmux option doesn't include your agent
   (`tmux show-option -gv @necromancer_agents`)
 - Watcher daemon is not running — check
-  `pgrep -af necro-watch-daemon.sh`
+  `pgrep -lf necro-watch-daemon.sh`
 - Sessions use a different shell command than registered adapters recognize
   (`necro_agent_for_cmd` in `lib/agents.sh`)
 
 ---
 
+## No autosave right after a reboot
+
+**Symptom:** The tmux server is back up but no new snapshot appears for the
+first minute or two.
+
+**Cause:** Deliberate. Autosave skips entirely during the first 90 seconds of
+machine uptime, so a snapshot taken of a half-restored server can't overwrite
+the good pre-reboot one before `necro-reboot-resume.sh` has run.
+
+**Fix:** None needed — wait it out, or run `necro-snapshot.sh --idle-only`
+by hand once your sessions are back.
+
+---
+
 ## Restore adds 0 windows on second run (idempotency)
 
-This is expected. Restore is keyed on a stable per-window marker
+This is expected. Restore is keyed on a stable per-pane marker
 (`@necro_id`). If the windows already exist from a previous restore run,
 they are reused — no duplicates, no extra agents launched.
 

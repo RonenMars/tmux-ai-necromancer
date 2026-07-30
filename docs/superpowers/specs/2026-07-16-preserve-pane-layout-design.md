@@ -3,6 +3,9 @@
 Date: 2026-07-16
 Status: approved
 
+> **As-built note (2026-07).** Every behavioral decision here matches the shipped code.
+> Only the implementation vehicle changed: the `WIN_FOR_GROUP` / `LAYOUT_FOR_GROUP` / `PANE_COUNT_FOR_GROUP` associative arrays were replaced by the `group_get`/`group_set` scalar map, because macOS ships `/bin/bash` 3.2 and `declare -A` there caused a silent 0-session restore — see invariant 13 in `CLAUDE.md`.
+
 ## Goal
 
 After `necro-restore.sh`, a multi-pane window reproduces its original pane
