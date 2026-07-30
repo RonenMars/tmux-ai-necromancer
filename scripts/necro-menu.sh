@@ -324,6 +324,7 @@ while true; do
   echo "  [2] Resume a specific backup"
   echo "  [3] Cleanup backups"
   echo "  [4] Reboot / shutdown prep"
+  echo "  [5] Diagnose (health check)"
   echo "  [0] Exit"
   necro_hr
   printf 'Choice: '
@@ -334,6 +335,7 @@ while true; do
     2) action_resume_backup ;;
     3) action_cleanup_backups ;;
     4) action_reboot_prep ;;
+    5) "$SELF_DIR/necro-doctor.sh" || true ;;
     0|"") echo ""; break ;;
     *) necro_warn "Invalid choice." ;;
   esac
