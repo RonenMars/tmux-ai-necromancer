@@ -104,6 +104,22 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    correct there; it also breaks a >60s-old lock, since a SIGKILLed watcher
    would otherwise wedge UUID pinning forever with no error anywhere.
 
+   **A trap is not enough — every lock also needs RECOVERY.** A signal the trap
+   can't catch leaves the lock held forever, and the failure is silent: each
+   later tick exits on "lock held" while the daemon still reports as running.
+   This cost 4.5 days of undetected autosave outage before `necro-doctor.sh`
+   found it. The autosave work subshell therefore stamps its pid inside the
+   lock (`$LOCK_DIR/pid`) and a later run reclaims the lock when `ps` says that
+   pid is not a `necro-autosave.sh` process — the same shape the daemon locks
+   use. Do NOT substitute `pgrep -f necro-autosave.sh`: any wrapper shell whose
+   command line merely mentions the script reads as a live owner and the lock
+   is never reclaimed (verified — it fails 4 of the 5 cases in
+   `necro-autosave-stale-lock-test.sh`). A pid-less lock is reclaimed on age
+   instead, so a wedge left by an older version still heals, but only after
+   60s so a run that just won `mkdir` isn't robbed before it can stamp its pid.
+   `$$` is the PARENT's pid inside a subshell and `BASHPID` is bash 4+
+   (invariant 13), so the pid comes from `sh -c 'echo $PPID'`.
+
 8. **Prune keys on child processes, not agent match, and operates per-window.**
    `necro-prune.sh` kills a window only when *every* pane's process has no child
    (`pgrep -P`) — so agents, editors, and builds all survive. Killing at the
@@ -244,6 +260,7 @@ bash tests/necro-restore-bash32-test.sh           # restore runs clean under sto
 bash tests/necro-agent-codex-matches-test.sh      # @necromancer_codex_commands globs; default still matches the truncated native binary
 bash tests/necro-agent-claude-matches-test.sh     # @necromancer_claude_commands globs; a plain name stays an exact match
 bash tests/necro-doctor-test.sh                   # doctor counts snapshot records, is read-only, exits 1 only on real problems
+bash tests/necro-autosave-stale-lock-test.sh      # the autosave work lock self-heals; a live owner is still respected
 bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
 bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot

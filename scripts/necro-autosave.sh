@@ -46,8 +46,51 @@ if [ -n "$boot_time" ] && [ $(( now - boot_time )) -lt 90 ]; then
 fi
 
 # Atomic mkdir guarantees only one concurrent daemon tick or manual invocation.
+#
+# A lock whose owner is gone MUST be reclaimed. The work runs in a backgrounded
+# subshell whose EXIT trap releases the lock; if that subshell dies to a signal
+# the trap cannot catch, the lock survives and every later tick exits right
+# here — autosave stops permanently, with no error anywhere and the daemon
+# still reporting as running. That is not hypothetical: it cost 4.5 days of
+# silent outage before necro-doctor.sh surfaced it.
+#
+# necro-watch.sh breaks its lock on age because a tick is sub-second. Here we
+# can be exact instead: a live owner is still a `necro-autosave.sh` process,
+# since the work subshell inherits the parent's argv. Note the daemon does NOT
+# match this pattern — `necro-autosave-daemon.sh` has no `necro-autosave.sh`
+# substring — so it is never mistaken for a lock owner.
+# Ownership is decided by a pid the work subshell records INSIDE the lock, then
+# checked with `ps` — the same shape #21 used for the daemon locks. Scanning
+# `pgrep -f necro-autosave.sh` instead looks simpler and is wrong: any wrapper
+# shell whose command line merely mentions the script (a `bash -c`, an editor
+# task, a CI step) reads as a live owner, so the lock is never reclaimed.
+# Looking up one recorded pid cannot false-positive that way.
 LOCK_DIR="$SNAP_DIR/.autosave.lock"
-mkdir "$LOCK_DIR" 2>/dev/null || { necro_log_event "autosave" "skip" "reason=lock_held"; exit 0; }
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  lock_pid="$(cat "$LOCK_DIR/pid" 2>/dev/null || true)"
+  lock_cmd=""
+  [ -n "$lock_pid" ] && lock_cmd="$(ps -o command= -p "$lock_pid" 2>/dev/null || true)"
+  case "$lock_cmd" in
+    *necro-autosave.sh*)
+      necro_log_event "autosave" "skip" "reason=lock_held" "owner=$lock_pid"
+      exit 0
+      ;;
+  esac
+  if [ -z "$lock_pid" ]; then
+    # No pid recorded. Either a run that just won mkdir and hasn't stamped it
+    # yet (microseconds), or a lock left by a pre-upgrade version that never
+    # wrote one. Age separates them, so an old plugin's wedge still self-heals.
+    lock_mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null)"
+    if [ -n "$lock_mtime" ] && [ "$(( now - lock_mtime ))" -le 60 ]; then
+      necro_log_event "autosave" "skip" "reason=lock_starting"
+      exit 0
+    fi
+  fi
+  necro_log_event "autosave" "recover_stale_lock" "stale_pid=${lock_pid:-none}"
+  rm -f "$LOCK_DIR/pid"
+  rmdir "$LOCK_DIR" 2>/dev/null
+  mkdir "$LOCK_DIR" 2>/dev/null || { necro_log_event "autosave" "skip" "reason=lock_held"; exit 0; }
+fi
 necro_log_event "autosave" "start" "snapshot_dir=$SNAP_DIR"
 tmux set-option -gq "$LAST_SAVE_OPTION" "$now"
 # NOTE: no `trap ... EXIT` here. The real work runs in the backgrounded
@@ -64,7 +107,11 @@ fi
 {
   # The lock is held for the LIFETIME OF THIS SUBSHELL — the work, not just the
   # setup above. Released on any exit path (success, error, kill).
-  trap 'rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+  trap 'rm -f "$LOCK_DIR/pid"; rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+  # Stamp our pid so a later run can tell "still working" from "died holding
+  # it". $$ is the PARENT's pid inside a subshell and BASHPID is bash 4+
+  # (invariant 13), so ask a child for its parent instead.
+  sh -c 'echo $PPID' > "$LOCK_DIR/pid" 2>/dev/null
   echo "[$(necro_ts)] autosave started"
   "$SELF_DIR/necro-snapshot.sh" --idle-only 2>&1
 
