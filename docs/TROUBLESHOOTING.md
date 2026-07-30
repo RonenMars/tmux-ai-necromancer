@@ -103,10 +103,42 @@ they are reused — no duplicates, no extra agents launched.
 
 - Claude resumes are skipped when the transcript is too large; pass
   `--force-large` or raise `@necromancer_max_claude_transcript_bytes` if that
-  is intentional.
+  is intentional. **This guard is Claude-only** — see below.
 - Restore skips unsafe debug cwd paths such as `/private/tmp/claude-*`,
   `*tmux-debug-build*`, and `*crashtest*`; pass `--allow-unsafe-cwd` only if
-  you know the snapshot is safe.
+  you know the snapshot is safe. This one applies to every agent.
+
+---
+
+## Codex-specific behavior
+
+### The transcript size guard doesn't apply
+
+`@necromancer_max_claude_transcript_bytes` and `--force-large` only affect
+Claude records — `necro-restore.sh` gates that check on `agent = claude`. A
+Codex rollout of any size is always resumed. If a huge rollout makes a restore
+crawl, remove that record from the snapshot before restoring, or resume the
+session by hand.
+
+### Only the 200 most-recent rollouts are searched
+
+Codex sessions are not foldered by cwd — they live in one date-nested tree and
+the working directory is recorded inside each rollout's first line. To resolve
+a cwd the adapter scans rollouts newest-first and reads that line, bounded to
+the **200 most recent across all projects**.
+
+A Codex session older than your last 200 rollouts is therefore invisible to the
+filesystem fallback. This only affects the fallback: a pane the watcher already
+pinned (or one launched with `codex resume <id>`, which is read straight from
+the process arguments) resolves regardless of age.
+
+### The pane command may not look like `codex`
+
+tmux reports the truncated basename of the native binary — `codex-aarch64-a`
+rather than `codex` — so the adapter matches `codex-*` as well as `codex`. If
+your pane shows some other command name entirely, see
+[`docs/agents.md`](agents.md).
+
 ## Debug logs
 
 - Enable tracing with `set -g @necromancer_debug 'on'` (or

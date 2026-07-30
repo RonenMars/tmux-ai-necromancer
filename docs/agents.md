@@ -83,7 +83,20 @@ The two reference adapters show both shapes:
   (`~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl`). The cwd lives
   inside the first `session_meta` line, so the fallback scans recent rollouts
   newest-first and matches on that embedded cwd. No reliable scrollback hint, so
-  the scrape returns "".
+  the scrape returns "". Three details worth copying if your agent stores
+  sessions the same way:
+  - The scan is **bounded to the 200 most-recent rollouts** for speed. Without
+    a per-cwd directory there is nothing to narrow the search by, so an
+    unbounded scan would read every rollout ever written on every lookup. The
+    cost is that a session older than the last 200 is invisible to the
+    fallback.
+  - The cwd comparison is **case-folded**. Codex canonicalizes the recorded cwd
+    to lowercase, and macOS filesystems are case-insensitive, so a literal
+    match would miss any path with capitals (`tb-PRs-follow` vs
+    `tb-prs-follow`).
+  - `agent_codex_scrape_ps_resume` matches the **subcommand** form
+    `codex resume <uuid>`, not a `--resume <uuid>` flag. Read your agent's
+    actual argv before writing this function; the flag form is not universal.
 
 ## Command name matching
 
