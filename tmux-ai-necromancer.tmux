@@ -16,6 +16,13 @@
 #   @necromancer_watch_tick      watcher polling interval in seconds  (default 1)
 #   @necromancer_resume_delay      seconds to pause between resume batches (default 5)
 #   @necromancer_resume_batch_size resumes launched per batch before pausing (default 1)
+#   @necromancer_claude_commands   command names that mean Claude Code    (default "claude")
+#
+# Read by the scripts themselves, not defaulted here (in-code fallbacks):
+#   @necromancer_resume_message       text sent into a pane after resume (default "continue")
+#   @necromancer_resume_message_delay seconds to wait before that message  (default 8)
+#   @necromancer_max_claude_transcript_bytes  resume size ceiling   (default 52428800)
+#   @necromancer_unsafe_cwd_patterns  globs restore refuses to rebuild (see --help)
 
 CURRENT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=lib/common.sh

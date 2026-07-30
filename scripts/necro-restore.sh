@@ -7,7 +7,7 @@
 #
 # IDEMPOTENT BY DESIGN — safe to run on an already-populated server:
 #   - reuses an existing session instead of erroring on "duplicate session"
-#   - skips a window whose (name+cwd) already exists in the target session
+#   - claims a pane already carrying its @necro_id marker instead of re-adding it
 #   - only sends the resume command into a freshly-created idle pane
 #   - never `set -e`-aborts on a tmux call; guards with `|| true` + warn
 #
@@ -416,10 +416,10 @@ while IFS= read -r line; do
     [ "$DRY_RUN" = "1" ] || tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
     # Register the claimed pane's window for this group, exactly as the
     # create paths do. Without this, a later record in the same
-    # (session, window_index) finds no WIN_FOR_GROUP entry and falls through
+    # (session, window_index) finds no group `win` entry and falls through
     # to `new-window` — flattening a multi-pane window into separate windows
     # (the invariant-2 regression) and skipping the layout replay, which
-    # requires WIN_FOR_GROUP to be set.
+    # requires the group `win` entry to be set.
     if [ "$DRY_RUN" = "0" ] && [ -z "$(group_get "$group" win)" ]; then
       claimed_win="$(tmux display-message -p -t "$pane_target" '#{window_id}' 2>/dev/null || true)"
       [ -n "$claimed_win" ] && group_set "$group" win "$claimed_win"

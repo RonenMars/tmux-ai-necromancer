@@ -137,4 +137,4 @@ else ln -sfn "$TARGET" "$POINTER" && necro_ok "Pointer: $POINTER → $(readlink 
 necro_hr
 
 necro_ok "Reboot prep complete. Now: sudo reboot → then necro-reboot-resume.sh"
-necro_log_event "reboot_prep" "complete" "snapshot=$SNAPSHOT"
+necro_log_event "reboot_prep" "complete" "snapshot=$TARGET"

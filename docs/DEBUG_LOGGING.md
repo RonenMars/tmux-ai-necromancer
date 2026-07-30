@@ -40,6 +40,19 @@ At that rate, leaving debug mode on without cleanup would use roughly
 file I/O only; they do not change snapshot contents, stop panes, or inspect
 agent transcripts.
 
+## Marking a repro
+
+Before reproducing a bug, stamp a labelled separator into every log file so the
+events that follow are easy to find later:
+
+```bash
+scripts/necro-log-divider.sh "scenario 3"
+```
+
+It appends `~~~~~~~ scenario 3 ~~~~~~~~` to every `*.log` in the log directory
+plus `autosave.log` in the snapshot directory. With no argument it prompts for
+the label. It refuses to run while debug logging is off.
+
 ## Cleanup
 
 Use the shell helper when tmux is available:

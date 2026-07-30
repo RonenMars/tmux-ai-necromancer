@@ -2,7 +2,7 @@
 # lib/agents/claude.sh — Claude Code adapter for tmux-ai-necromancer.
 #
 # Claude Code stores one transcript per conversation as a .jsonl file under
-#   ~/.claude/projects/<cwd-with-slashes-as-dashes>/<uuid>.jsonl
+#   ~/.claude/projects/<cwd-with-/-.-and-_-all-as-dashes>/<uuid>.jsonl
 # and resumes with `claude --resume <uuid>`. On clean exit it prints a farewell
 # line containing `claude --resume <uuid>` which the snapshotter can scrape.
 
