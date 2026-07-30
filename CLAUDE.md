@@ -24,6 +24,7 @@ scripts/                   the executables (all source lib/*.sh)
   necro-reboot-prep.sh     pre-reboot: snapshot + enrich + resurrect save + pin pointer
   necro-reboot-resume.sh   post-reboot: ensure server up → necro-restore.sh
   necro-prune.sh           kill windows whose panes are all idle shells (no child procs)
+  necro-doctor.sh          read-only health check (daemons, locks, pins, snapshot)
   necro-menu.sh            interactive menu: list/resume/cleanup snapshots, reboot prep
   necro-log-divider.sh     stamp a labelled separator into every debug log
   necro-clean-debug-logs.sh   remove debug logs (needs tmux)
@@ -242,6 +243,7 @@ bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume 
 bash tests/necro-restore-bash32-test.sh           # restore runs clean under stock /bin/bash 3.2 (no declare -A)
 bash tests/necro-agent-codex-matches-test.sh      # @necromancer_codex_commands globs; default still matches the truncated native binary
 bash tests/necro-agent-claude-matches-test.sh     # @necromancer_claude_commands globs; a plain name stays an exact match
+bash tests/necro-doctor-test.sh                   # doctor counts snapshot records, is read-only, exits 1 only on real problems
 bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
 bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot

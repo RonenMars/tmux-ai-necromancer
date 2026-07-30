@@ -105,6 +105,7 @@ The one script that does run natively is `scripts/necro-clean-debug-logs.py`
 | Dry-run a restore | `necro-restore.sh --dry-run` |
 | Before reboot | `necro-reboot-prep.sh` (or `safe-reboot` / `safe-shutdown` aliases) |
 | After reboot | `necro-reboot-resume.sh` |
+| Check the plugin's health | `necro-doctor.sh` (read-only) |
 | Prune idle-shell windows | `necro-prune.sh` (`--dry-run` to preview) |
 | Reorganize LIVE panes into sessions | `necro-apply.sh <file.jsonl>` (see note below) |
 | Interactive menu | `necro-menu.sh` |

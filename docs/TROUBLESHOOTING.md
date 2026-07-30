@@ -1,5 +1,30 @@
 # Troubleshooting
 
+## Start here: `necro-doctor.sh`
+
+Before working through the entries below, run the health check:
+
+```bash
+scripts/necro-doctor.sh
+```
+
+It is strictly read-only — it sends no keys, kills nothing, and writes nothing —
+so it is safe against a live server at any time, including from inside tmux. It
+exits 1 if it found a problem (✗) and 0 if it only found warnings (⚠).
+
+It checks dependencies, your *effective* configuration (resolved the way the
+scripts resolve it, so it catches a `~/.tmux.conf` edit you never re-sourced),
+both daemons, both work locks, adapter loading, how many live agent panes have
+a pinned UUID, the newest snapshot's age and how many of its records are
+actually resumable, and the reboot pointer.
+
+The two checks worth reading first are **the newest snapshot** and **live agent
+panes**. A snapshot whose records carry no UUID will resurrect nothing however
+healthy everything else looks, and agent panes without a pinned UUID mean the
+watcher is falling back to filesystem guesses. Note that a daemon can be
+running while doing no work — a wedged lock produces exactly that — so
+"daemon running" alone is not a clean bill of health.
+
 ## Sessions missing after reboot
 
 **Symptom:** `necro-resume` restores only a handful of sessions; most are gone.
@@ -69,11 +94,18 @@ sessions.
 **Likely cause:** The autosave fired during or after a shutdown sequence, and
 most sessions were already gone. See **Sessions missing after reboot** above.
 
-**Other causes to rule out:**
+**Other causes to rule out** — `scripts/necro-doctor.sh` reports all of these
+at once:
 - `@necromancer_agents` tmux option doesn't include your agent
   (`tmux show-option -gv @necromancer_agents`)
 - Watcher daemon is not running — check
   `pgrep -lf necro-watch-daemon.sh`
+- A **stale work lock**. `.autosave.lock` is taken by each snapshot run and
+  released by a trap; if that run is killed (a laptop sleeping mid-snapshot
+  will do it) the lock survives and every later tick exits silently. The
+  daemon keeps reporting as running the whole time, so check the lock, not
+  just the process. `necro-doctor.sh` flags one held longer than 10 minutes;
+  clear it with `rmdir "$(tmux show-option -gv @necromancer_snapshot_dir)/.autosave.lock"`.
 - Sessions use a different shell command than registered adapters recognize
   (`necro_agent_for_cmd` in `lib/agents.sh`)
 
