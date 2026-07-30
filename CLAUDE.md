@@ -117,6 +117,9 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    `necro-autosave-stale-lock-test.sh`). A pid-less lock is reclaimed on age
    instead, so a wedge left by an older version still heals, but only after
    60s so a run that just won `mkdir` isn't robbed before it can stamp its pid.
+   Recovery fires on the next *due* autosave, not the next daemon tick — the
+   interval throttle returns before the lock code — so worst-case heal time is
+   one `@necromancer_interval`, not one `@necromancer_autosave_tick`.
    `$$` is the PARENT's pid inside a subshell and `BASHPID` is bash 4+
    (invariant 13), so the pid comes from `sh -c 'echo $PPID'`.
 
