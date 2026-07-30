@@ -12,10 +12,24 @@ CODEX_UUID_RE='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 CODEX_SESSIONS_DIR="$HOME/.codex/sessions"
 
 # Does this pane's foreground command belong to Codex?
-# tmux reports the native binary's truncated basename (e.g. "codex-aarch64-a"
-# for codex-aarch64-apple-darwin), not the "codex" wrapper — match that too.
+# Checks against @necromancer_codex_commands (space-separated, default
+# "codex codex-*"). Entries are glob patterns, so the default covers both the
+# "codex" wrapper and the native binary's truncated basename — tmux reports
+# e.g. "codex-aarch64-a" for codex-aarch64-apple-darwin.
 agent_codex_matches() {
-  case "$1" in codex|codex-*) return 0 ;; *) return 1 ;; esac
+  local cmd="$1" name cmds matched=1
+  cmds="$(necro_tmux_option @necromancer_codex_commands "codex codex-*")"
+  # Splitting the unquoted list would ALSO pathname-expand a pattern like
+  # `codex-*` against the process's cwd, silently replacing it with whatever
+  # files happen to be there. Disable globbing for the split; `case` pattern
+  # matching is unaffected by `set -f`.
+  set -f
+  for name in $cmds; do
+    # shellcheck disable=SC2254
+    case "$cmd" in $name) matched=0; break ;; esac
+  done
+  set +f
+  return "$matched"
 }
 
 # Codex has no per-project dir; report the sessions root for diagnostics.

@@ -101,16 +101,32 @@ The two reference adapters show both shapes:
 ## Command name matching
 
 `agent_<name>_matches` is called with `pane_current_command` — the process
-name the kernel sees. For Claude Code, this is `claude` by default, but if
-you run it via an alias or wrapper script named differently (e.g. `cc`), add
-your command name to `@necromancer_claude_commands`:
+name the kernel sees. Both bundled adapters read a space-separated list of
+command names from a tmux option, so an alias or wrapper script named
+differently needs a config change, not a code change:
+
+| Option | Default | Matches |
+|---|---|---|
+| `@necromancer_claude_commands` | `claude` | Claude Code |
+| `@necromancer_codex_commands` | `codex codex-*` | Codex |
 
 ```tmux
 set -g @necromancer_claude_commands 'claude cc'
+set -g @necromancer_codex_commands  'codex codex-* cx'
 ```
 
+Entries are **glob patterns**, not exact strings. A plain name matches only
+itself, so existing config keeps working, but a pattern lets one entry cover a
+family of names. That is why the Codex default is two entries: tmux reports the
+native binary's truncated basename (`codex-aarch64-a` for
+`codex-aarch64-apple-darwin`), so `codex-*` catches it while `codex` catches
+the wrapper. Note the list is split with globbing disabled, so a pattern is
+never accidentally expanded against the working directory.
+
 Other agents: implement `agent_<name>_matches` to match however your binary
-appears in `pane_current_command`.
+appears in `pane_current_command`. Reading your own
+`@necromancer_<name>_commands` option is the friendlier pattern — copy either
+bundled adapter.
 
 ## Register it
 

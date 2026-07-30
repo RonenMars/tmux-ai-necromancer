@@ -9,15 +9,22 @@
 CLAUDE_UUID_RE='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 
 # Does this pane's foreground command belong to Claude Code?
-# Checks against @necromancer_claude_commands (space-separated, default "claude").
+# Checks against @necromancer_claude_commands (space-separated, default
+# "claude"). Entries are glob patterns, matching agent_codex_matches — a plain
+# name like `claude` or `cc` has no metacharacters and behaves as an exact
+# match, so this is backward compatible.
 agent_claude_matches() {
-  local cmd="$1" name
-  local cmds
+  local cmd="$1" name cmds matched=1
   cmds="$(necro_tmux_option @necromancer_claude_commands claude)"
+  # See agent_codex_matches: splitting the unquoted list would pathname-expand
+  # any pattern against the cwd. `case` matching is unaffected by `set -f`.
+  set -f
   for name in $cmds; do
-    [ "$cmd" = "$name" ] && return 0
+    # shellcheck disable=SC2254
+    case "$cmd" in $name) matched=0; break ;; esac
   done
-  return 1
+  set +f
+  return "$matched"
 }
 
 # Per-project transcript directory for a cwd ("" if none).
