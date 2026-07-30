@@ -101,11 +101,14 @@ at once:
 - Watcher daemon is not running — check
   `pgrep -lf necro-watch-daemon.sh`
 - A **stale work lock**. `.autosave.lock` is taken by each snapshot run and
-  released by a trap; if that run is killed (a laptop sleeping mid-snapshot
-  will do it) the lock survives and every later tick exits silently. The
-  daemon keeps reporting as running the whole time, so check the lock, not
-  just the process. `necro-doctor.sh` flags one held longer than 10 minutes;
-  clear it with `rmdir "$(tmux show-option -gv @necromancer_snapshot_dir)/.autosave.lock"`.
+  released by a trap; if that run is killed the lock would survive and every
+  later tick exit silently, with the daemon still reporting as running.
+  Autosave now recovers this itself — the run stamps its pid inside the lock
+  and a later run reclaims it once that pid is gone — so it should heal within
+  one tick. `necro-doctor.sh` still reports a lock held over 10 minutes; if you
+  ever see one persist, clear it with
+  `rmdir "$(tmux show-option -gv @necromancer_snapshot_dir)/.autosave.lock"`
+  and please file a bug, because the recovery should have handled it.
 - Sessions use a different shell command than registered adapters recognize
   (`necro_agent_for_cmd` in `lib/agents.sh`)
 
