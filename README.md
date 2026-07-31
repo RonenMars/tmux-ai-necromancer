@@ -1,5 +1,7 @@
 # 🪦 tmux-ai-necromancer 🪦
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 <img src="banner/github-banner.svg" width="100%" alt="tmux-ai-necromancer banner">
 
 > Bring your dead AI coding sessions back to life.
@@ -47,6 +49,17 @@ set -g @plugin 'RonenMars/tmux-ai-necromancer'
 
 That's it — the autosave daemon starts immediately. See
 [`docs/INSTALL.md`](docs/INSTALL.md) for manual install, dependencies, and WSL2.
+
+## Key bindings
+
+| Keys | Action |
+|---|---|
+| `prefix + R` | Restore latest snapshot (popup) |
+| `necro-menu` | Browse/restore/cleanup snapshots, prep for reboot |
+| `necro-doctor.sh` | Check the plugin's health (read-only) |
+
+Full command reference, including snapshot/restore scripts and recommended
+aliases: [`docs/USAGE.md`](docs/USAGE.md).
 
 ## Documentation
 
