@@ -35,6 +35,7 @@ lib/
   agents/<name>.sh         one file per agent (the contract)
 tui/                       Go + Bubble Tea read-only session viewer
 docs/agents.md             how to add an agent adapter
+docs/incidents/            postmortems — read before debugging a silent failure
 ```
 
 ## The agent adapter contract
