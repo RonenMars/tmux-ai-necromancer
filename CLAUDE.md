@@ -235,8 +235,14 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
 Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
 runs `scripts/necro-doctor.sh` first, maps each finding to the test that covers
 it and the fix that applies, and lists the scripts that must never be run
-against a live tmux server. Codex reaches the same file via `AGENTS.md` and the
-`.codex/skills/` symlink — one copy, so the two can't drift.
+against a live tmux server.
+
+One file serves both tools: `.codex/skills/necro-triage` is a relative symlink
+to the `.claude/` directory, and Codex discovers it as a repo-local skill
+(verified on codex-cli 0.146.0), resolving it back to the same path. Check with
+`codex debug prompt-input | grep -i necro-triage` from the repo root. Keep it a
+symlink — two hand-maintained copies is the drift this repo's own audit kept
+finding.
 
 ## Testing
 
