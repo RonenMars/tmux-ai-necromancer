@@ -230,6 +230,26 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     Don't remove or weaken this guard to "simplify" the flag parsing or the
     tty check.
 
+15. **A watcher tick costs a CONSTANT number of tmux invocations — never one
+    per pane.** `@necromancer_watch_tick` defaults to 1, so anything that
+    scales with pane count runs against the single-threaded tmux server every
+    second, forever. Two things keep it flat, and both are easy to undo by
+    accident. First, the pane's `@necro_*` options ride along in the
+    `list-panes -F` format (tmux resolves `#{@necro_uuid}` per pane) instead of
+    a `show-options -p -t <pane>` per pane. Second, `necro-watch.sh` calls
+    `_necro_load_tmux_options_g` at the TOP LEVEL before the walk:
+    `necro_tmux_option` memoizes `tmux show-options -g`, but every caller
+    invokes it as `$(necro_tmux_option ...)` — a subshell — so the memo dies
+    with the subshell and each pane re-dumps every global option once per agent
+    adapter. Measured on a 10-pane server: 30 invocations per tick before, 3
+    after. The list-panes fields are separated by ASCII Unit Separator
+    (`$'\037'`), **not tab** — bash collapses a run of IFS *whitespace* into a
+    single delimiter, so with tabs an unpinned pane (all five options empty,
+    the normal case) reads its cwd into `pinned_uuid` and shifts every field.
+    A non-whitespace IFS char delimits exactly one field and preserves empties.
+    `necro-watch-tick-cost-test.sh` asserts the count is equal for 1 and 12
+    panes; without the priming it reads 7 and 29.
+
 ## Triaging a broken environment
 
 Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
@@ -265,6 +285,7 @@ bash tests/necro-agent-scrape-ps-resume-test.sh   # ps-argv is ground truth for 
 bash tests/necro-agent-scrape-ps-resume-multichild-test.sh  # finds claude among sibling processes
 bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts
 bash tests/necro-watch-priority-order-test.sh     # argv > scrollback > cursor-pop, end-to-end
+bash tests/necro-watch-tick-cost-test.sh          # a tick is O(1) tmux calls, not O(panes)
 bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp doesn't drift across ticks
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit

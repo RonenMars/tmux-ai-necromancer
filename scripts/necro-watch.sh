@@ -26,6 +26,19 @@ done
 SELF_DIR="$(cd -P "$(dirname "$_src")" && pwd)"
 . "$SELF_DIR/../lib/common.sh"
 . "$SELF_DIR/../lib/agents.sh"
+
+# Prime the global-option cache HERE, in the top-level shell.
+#
+# necro_tmux_option() memoizes `tmux show-options -g`, but every caller invokes
+# it as `$(necro_tmux_option ...)` — a subshell — so the memo dies with the
+# subshell and the next call dumps every global option again. Each pane costs
+# one such dump per agent adapter (@necromancer_<agent>_commands), so the tick
+# scaled at panes x adapters: measured at 28 full dumps for a 10-pane server.
+# Priming in the parent means the subshells inherit a warm cache and skip it.
+# Nothing here mutates a global option before the walk, so the cache can't go
+# stale within a tick, and each tick is a fresh process that re-primes.
+_necro_load_tmux_options_g
+
 necro_init_log "$0"
 necro_load_agents
 
@@ -69,14 +82,24 @@ export NECRO_CURSOR_DIR
 NECRO_CURSOR_DIR="$(necro_watch_cursor_dir)"
 
 # Walk every pane.
-while IFS=$'\t' read -r pane_id cmd cwd; do
+#
+# The pane's @necro_* options come straight out of the list-panes format rather
+# than a `show-options -p` per pane: at @necromancer_watch_tick 1 that per-pane
+# read was one tmux round-trip per pane per second, forever. One format string
+# makes a tick exactly one tmux invocation regardless of pane count.
+# pane_current_path is read LAST so that a separator inside a path
+# (pathological, but free to defend against) lands in the final field instead
+# of shifting every option one column over.
+#
+# The separator is ASCII Unit Separator, NOT tab: bash collapses a run of IFS
+# *whitespace* into a single delimiter, so with tabs a pane whose @necro_uuid
+# is unset would read its @necro_cmd into pinned_uuid and shift every field
+# after it. A non-whitespace IFS char delimits exactly one field, preserving
+# empties — which is the normal case here, since an unpinned pane has all five
+# options unset.
+NECRO_FS=$'\037'
+while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent exited first_seen cwd; do
   [ -z "$pane_id" ] && continue
-
-  necro_load_tmux_options_p "$pane_id"
-  pinned_uuid="$(necro_tmux_option_p @necro_uuid)"
-  pinned_cmd="$(necro_tmux_option_p @necro_cmd)"
-  pinned_agent="$(necro_tmux_option_p @necro_agent)"
-  exited="$(necro_tmux_option_p @necro_agent_exited)"
 
   agent="$(necro_agent_for_cmd "$cmd")"
 
@@ -88,7 +111,11 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
     tmux set-option -pu -t "$pane_id" @necro_agent           2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_agent_exited    2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_pane_first_seen 2>/dev/null || true
-    pinned_uuid=""; pinned_cmd=""; pinned_agent=""; exited=""
+    # first_seen is cleared too: it was read before the unset above, and Case 2
+    # re-stamps it. Leaving the pre-unset value here would keep the OLD stamp,
+    # and the min_epoch filter would then reject the relaunched agent's own
+    # (newer) transcript.
+    pinned_uuid=""; pinned_cmd=""; pinned_agent=""; exited=""; first_seen=""
     # Falls through to Case 2 (pin fresh UUID).
   fi
 
@@ -105,7 +132,6 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
     # First-seen stamp: closest proxy tmux offers for pane creation time.
     # Written before the cursor-pop fallback so that fallback can reject
     # transcripts older than this pane.
-    first_seen="$(necro_tmux_option_p @necro_pane_first_seen)"
     if [ -z "$first_seen" ]; then
       first_seen="$now"
       tmux set-option -p -t "$pane_id" @necro_pane_first_seen "$first_seen" 2>/dev/null || true
@@ -150,6 +176,6 @@ while IFS=$'\t' read -r pane_id cmd cwd; do
     continue
   fi
 
-done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_command}	#{pane_current_path}' 2>/dev/null)
+done < <(tmux list-panes -a -F "#{pane_id}${NECRO_FS}#{pane_current_command}${NECRO_FS}#{@necro_uuid}${NECRO_FS}#{@necro_cmd}${NECRO_FS}#{@necro_agent}${NECRO_FS}#{@necro_agent_exited}${NECRO_FS}#{@necro_pane_first_seen}${NECRO_FS}#{pane_current_path}" 2>/dev/null)
 
 exit 0
