@@ -74,7 +74,12 @@ case "$1" in
     # Agent suspended (Ctrl-Z) or exited: pane_current_command reports the
     # shell either way — that's the whole reason Case 3 needs the liveness
     # check instead of trusting this field alone.
-    printf '%%1\tzsh\t%s\n' "$CWD"
+    # Pane options now ride along in the list-panes format, so the stub must
+    # report them from the same STATE the set-option branch writes.
+    _o() { line="$(grep -F "%1|$1=" "$STATE" 2>/dev/null | tail -1)"; printf '%s' "${line#*=}"; }
+    printf '%%1\x1fzsh\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\x1f%s\n' \
+      "$(_o @necro_uuid)" "$(_o @necro_cmd)" "$(_o @necro_agent)" \
+      "$(_o @necro_agent_exited)" "$(_o @necro_pane_first_seen)" "$CWD"
     exit 0
     ;;
   display-message) printf '999\n'; exit 0 ;;
