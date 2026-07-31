@@ -22,22 +22,15 @@ killing 9 live Claude Code sessions at once, with no way to get them back.
 
 ## What it does
 
-- **Pane watcher** — a per-tick hook that detects agent panes the moment they
-  start (or exit) and pins the session UUID directly to the pane, so autosave
-  never has to guess. Handles command aliases (`cc` for `claude`, etc.).
-- **Autosave** — every 5 minutes (configurable), walks every tmux pane and
-  records each pane's agent + resumable session id to a JSONL snapshot. Prefers
-  watcher-pinned UUIDs; falls back to filesystem heuristics. Runs in the
-  background off the status bar; **never touches a running agent**.
-- **Restore** — reads the latest snapshot and recreates sessions/windows,
-  running the right resume command per agent (`claude --resume <id>`,
-  `codex resume <id>`, …). **Idempotent** — safe to run repeatedly on a
-  half-populated server; it fills gaps instead of duplicating windows or
-  erroring out.
-- **Reboot survival** — `prep`/`resume` wrappers that pair with tmux-resurrect +
-  tmux-continuum to bring the whole layout (and every agent) back after a reboot.
-- **Session viewer (TUI)** — a Go + Bubble Tea viewer/capture tool that joins
-  live panes against the latest snapshot and can exit supported agents on demand.
+- 👁️ **Pane watcher** — pins each pane's session UUID the instant an agent starts.
+
+- 💾 **Autosave** — snapshots every pane's agent + session id on a timer, in the background, without touching a running agent.
+
+- 🧟 **Restore** — recreates sessions and resumes every agent, idempotently.
+
+- 🔁 **Reboot survival** — pairs with tmux-resurrect + tmux-continuum to bring the whole layout back after a reboot.
+
+- 🖥️ **Session viewer (TUI)** — a live viewer that joins panes against the latest snapshot.
 
 ## Quick start
 
