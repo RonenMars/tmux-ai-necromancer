@@ -11,3 +11,9 @@ tui/bin/
 *.jsonl
 tmux-snapshots/
 .worktrees/
+
+# Draft social/marketing posts — working files, never part of the plugin.
+# Ignored rather than merely untracked so `git add -A` can't sweep them in.
+linkedin*.md
+*-post.md
+posts/
