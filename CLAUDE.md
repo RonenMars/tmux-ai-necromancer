@@ -36,6 +36,9 @@ lib/
 tui/                       Go + Bubble Tea read-only session viewer
 docs/agents.md             how to add an agent adapter
 docs/incidents/            postmortems — read before debugging a silent failure
+.claude/skills/            project skills (necro-triage: diagnose + fix locally)
+.codex/skills/             symlinks to the same skills, for Codex
+AGENTS.md                  project entry point for Codex and other agents
 ```
 
 ## The agent adapter contract
@@ -226,6 +229,14 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     keys, silently exiting every live Claude Code / Codex session it found.
     Don't remove or weaken this guard to "simplify" the flag parsing or the
     tty check.
+
+## Triaging a broken environment
+
+Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
+runs `scripts/necro-doctor.sh` first, maps each finding to the test that covers
+it and the fix that applies, and lists the scripts that must never be run
+against a live tmux server. Codex reaches the same file via `AGENTS.md` and the
+`.codex/skills/` symlink — one copy, so the two can't drift.
 
 ## Testing
 
