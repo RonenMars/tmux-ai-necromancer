@@ -16,7 +16,7 @@ It is **multi-agent**: [Claude Code](https://claude.com/claude-code) and
 adding another agent is one small adapter file.
 
 Born from a real problem: tmux 3.6b crashes (heap corruption in copy mode) kept
-killing a dozen live Claude Code sessions at once, with no way to get them back.
+killing 9 live Claude Code sessions at once, with no way to get them back.
 
 ## What it does
 
