@@ -11,11 +11,22 @@ Contradicting one is a regression, not a cleanup. Read it first.
 
 ## Troubleshooting and fixing the local environment
 
-Follow **`.claude/skills/necro-triage/SKILL.md`**. It is the canonical
-procedure — doctor first, then a finding → test → fix table, then the rules for
-changing code safely. The same file is linked at `.codex/skills/necro-triage/`
-so it loads as a Codex skill where repo-local skills are supported; read it
-directly if it does not.
+Follow the **`necro-triage`** skill — doctor first, then a finding → test → fix
+table, then the rules for changing code safely.
+
+It is one file, `.claude/skills/necro-triage/SKILL.md`, with
+`.codex/skills/necro-triage` a relative symlink to it. Codex discovers it as a
+repo-local skill (verified on codex-cli 0.146.0) and resolves it through the
+symlink to that path, so both tools read the same bytes and cannot drift. To
+confirm on your machine, from the repo root:
+
+```bash
+codex debug prompt-input | grep -i necro-triage
+```
+
+That renders what Codex actually sends the model. Discovery is cwd-dependent —
+run it from the repo. If a future version stops discovering repo-local skills,
+this file still names the path; read it directly.
 
 The short version:
 
