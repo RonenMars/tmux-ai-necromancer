@@ -18,6 +18,10 @@ both daemons, both work locks, adapter loading, how many live agent panes have
 a pinned UUID, the newest snapshot's age and how many of its records are
 actually resumable, and the reboot pointer.
 
+For a worked example of a failure this catches — autosave silently stopped for
+~12 of 13 days while every other signal reported healthy — see
+[`docs/incidents/2026-07-autosave-lock-outage.md`](incidents/2026-07-autosave-lock-outage.md).
+
 The two checks worth reading first are **the newest snapshot** and **live agent
 panes**. A snapshot whose records carry no UUID will resurrect nothing however
 healthy everything else looks, and agent panes without a pinned UUID mean the
