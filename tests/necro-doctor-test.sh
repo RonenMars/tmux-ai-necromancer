@@ -78,6 +78,16 @@ run_doctor >/dev/null 2>&1
 after="$(/bin/ls -1 "$SNAP" | sort)"
 [ "$before" = "$after" ] || { echo "FAIL: doctor mutated the snapshot dir"; echo "  before: $before"; echo "  after:  $after"; fail=1; }
 
+# --- a lock newer than the run must never report a negative age -------------
+# The watcher ticks every second, so its lock is routinely created after the
+# doctor started. Reusing a startup timestamp printed "held for -1s".
+mkdir -p "$SNAP/.watch.lock"
+touch -A 010000 "$SNAP/.watch.lock" 2>/dev/null || touch -d '+1 hour' "$SNAP/.watch.lock" 2>/dev/null
+out="$(run_doctor)"
+refute "no negative lock age" "$out" "for -"
+check  "future-dated lock still reported as held" "$out" "watcher lock held"
+rm -rf "$SNAP/.watch.lock"
+
 # --- --help exits 0 and sends no keys ---------------------------------------
 help_out="$(/bin/bash "$ROOT/scripts/necro-doctor.sh" --help 2>&1)"; rc=$?
 [ "$rc" -eq 0 ] || { echo "FAIL: --help should exit 0, got $rc"; fail=1; }

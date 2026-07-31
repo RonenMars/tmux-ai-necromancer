@@ -142,7 +142,7 @@ fi
 # A wedged lock is silent: UUID pinning simply stops, with no error anywhere.
 section "Work locks"
 check_lock() {
-  local label="$1" path="$SNAP_DIR/$2" stale_after="$3" age m
+  local label="$1" path="$SNAP_DIR/$2" stale_after="$3" age m now
   if [ ! -d "$path" ]; then
     ok "$label lock free"
     return
@@ -152,7 +152,13 @@ check_lock() {
     warn "$label lock held (age unknown)"
     return
   fi
-  age=$((NOW - m))
+  # Re-sample the clock rather than reusing $NOW from startup. The watcher
+  # ticks every second, so its lock is routinely created AFTER this run began
+  # and NOW - mtime goes negative — reported as "held for -1s". Clamp too, so
+  # clock skew or a filesystem with coarse timestamps can't reintroduce it.
+  now="$(date +%s)"
+  age=$((now - m))
+  [ "$age" -lt 0 ] && age=0
   if [ "$age" -gt "$stale_after" ]; then
     bad "$label lock held for $(human_age "$age") — stale, blocking work"
     note "remove it with: rmdir '$path'"
