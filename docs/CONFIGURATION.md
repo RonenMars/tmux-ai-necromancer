@@ -70,7 +70,11 @@ disable the message when that matters. Also configurable via `--resume-message` 
 Snapshots also record each pane's `window_layout`, and restore replays it with
 `select-layout` so a multi-pane window comes back with its original arrangement
 and sizes — but only when the restored pane count matches the snapshot's, so a
-partially-restored or user-modified window is never reshaped.
+partially-restored or user-modified window is never reshaped. The active pane,
+the session's active window, and a zoomed pane (`zoomed` / `pane_active` /
+`window_active` record flags) are restored the same way — only for windows the
+run created, and zoom is re-applied after the layout replay since
+`select-layout` unzooms.
 
 The snapshot dir defaults to `~/.claude/tmux-snapshots` (so it stays compatible
 with prior Claude-only setups). Override with the option above or the

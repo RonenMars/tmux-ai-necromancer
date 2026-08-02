@@ -371,6 +371,10 @@ while IFS= read -r line; do
   agent=$(jq -r '.agent // empty' <<<"$line")
   uuid=$(jq -r '.uuid // empty' <<<"$line")
   layout=$(jq -r '.window_layout // empty' <<<"$line")
+  # 0/1 flags; absent in pre-flag snapshots, so default 0 (no-op on replay).
+  zoomed=$(jq -r '.zoomed // 0' <<<"$line")
+  pactive=$(jq -r '.pane_active // 0' <<<"$line")
+  wactive=$(jq -r '.window_active // 0' <<<"$line")
 
   if [ -z "$session" ] || [ -z "$cwd" ]; then
     progress_record "$i" "$total_records" "skipping record: missing session or cwd"
@@ -480,6 +484,14 @@ while IFS= read -r line; do
     fresh=1
   fi
 
+  # Track active-pane / zoom / active-window flags for the post-loop replay.
+  # apane only lands for panes resolved this run; the marker-reuse path never
+  # sets the group's `win`, so its flags are ignored downstream (same rule as
+  # the layout replay — a live window's focus/zoom is the user's, not ours).
+  [ "$pactive" = "1" ] && [ -n "$pane_target" ] && group_set "$group" apane "$pane_target"
+  [ "$zoomed" = "1" ] && group_set "$group" zoom 1
+  [ "$wactive" = "1" ] && group_set "$group" wactive 1
+
   # Target for send-keys: the pane id (stable) we just resolved.
   target="${pane_target:-${session}:${safe_name}}"
 
@@ -544,6 +556,31 @@ while IFS= read -r group; do
     tmux select-layout -t "$win" "$layout" 2>/dev/null || true
   else
     echo "  layout skipped for $group: pane count $live != $saved"
+  fi
+done <<EOF
+$GROUP_KEYS
+EOF
+
+# Re-apply active pane, zoom, and active window for windows this run
+# created/claimed. Runs AFTER the layout replay: select-layout unzooms a
+# window, so zoom must be restored last. #{window_layout} stores the saved
+# (unzoomed) layout even while zoomed, so the two never conflict. Zoom is
+# only re-applied when the active pane's record made it through the loop —
+# with no known target pane, zooming would enlarge an arbitrary one.
+while IFS= read -r group; do
+  [ -z "$group" ] && continue
+  win="$(group_get "$group" win)"
+  [ -z "$win" ] && continue
+  case "$win" in *:dry) continue ;; esac
+  apane="$(group_get "$group" apane)"
+  if [ -n "$apane" ]; then
+    tmux select-pane -t "$apane" 2>/dev/null || true
+    if [ "$(group_get "$group" zoom)" = "1" ]; then
+      tmux resize-pane -Z -t "$apane" 2>/dev/null || true
+    fi
+  fi
+  if [ "$(group_get "$group" wactive)" = "1" ]; then
+    tmux select-window -t "$win" 2>/dev/null || true
   fi
 done <<EOF
 $GROUP_KEYS

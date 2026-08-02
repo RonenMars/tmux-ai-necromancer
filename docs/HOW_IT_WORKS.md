@@ -28,7 +28,7 @@ A snapshot is JSON Lines, one record per pane:
 {"pane_id":"%5","session":"tb-mobile","window_index":3,"window_name":"feat:x",
  "cwd":"/Users/you/dev/app","prev_cmd":"claude","agent":"claude",
  "uuid":"abc-…","uuid_source":"pane-option","window_layout":"c005,364x71,0,0{…}",
- "captured_at":"…",
+ "zoomed":0,"pane_active":1,"window_active":1,"captured_at":"…",
  "first_user":"","last_assistant":"","dest_session":"","dest_window_name":""}
 ```
 
