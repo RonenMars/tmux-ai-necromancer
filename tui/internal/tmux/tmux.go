@@ -31,6 +31,10 @@ type Pane struct {
 	WindowName     string
 	CWD            string
 	CurrentCommand string
+	WindowLayout   string // tmux layout string; saved (unzoomed) even while zoomed
+	Zoomed         bool   // window_zoomed_flag
+	PaneActive     bool   // pane_active — this pane is its window's active pane
+	WindowActive   bool   // window_active — this window is its session's current one
 }
 
 // ListPanes shells out to `tmux list-panes -a` and parses the result.
@@ -45,6 +49,10 @@ func ListPanes() ([]Pane, error) {
 		"#{window_name}",
 		"#{pane_current_path}",
 		"#{pane_current_command}",
+		"#{window_layout}",
+		"#{window_zoomed_flag}",
+		"#{pane_active}",
+		"#{window_active}",
 	}, sep)
 
 	cmd := exec.Command("tmux", "list-panes", "-a", "-F", format)
@@ -64,7 +72,7 @@ func ListPanes() ([]Pane, error) {
 			continue
 		}
 		fields := strings.Split(line, sep)
-		if len(fields) != 6 {
+		if len(fields) != 10 {
 			continue
 		}
 		idx, _ := strconv.Atoi(fields[2])
@@ -75,6 +83,10 @@ func ListPanes() ([]Pane, error) {
 			WindowName:     fields[3],
 			CWD:            fields[4],
 			CurrentCommand: fields[5],
+			WindowLayout:   fields[6],
+			Zoomed:         fields[7] == "1",
+			PaneActive:     fields[8] == "1",
+			WindowActive:   fields[9] == "1",
 		})
 	}
 	debuglog.Event("tmux", "list_panes_complete", map[string]string{"panes": strconv.Itoa(len(panes))})

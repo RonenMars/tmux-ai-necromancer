@@ -551,17 +551,29 @@ func uuidSource(agent string) string {
 
 func recordForPane(pane tmux.Pane, agent, uuid string) snapshot.Record {
 	return snapshot.Record{
-		PaneID:      pane.PaneID,
-		Session:     pane.SessionName,
-		WindowIndex: pane.WindowIndex,
-		WindowName:  pane.WindowName,
-		CWD:         pane.CWD,
-		PrevCmd:     agent,
-		Agent:       agent,
-		UUID:        uuid,
-		UUIDSource:  uuidSource(agent),
-		CapturedAt:  time.Now().UTC().Format(time.RFC3339),
+		PaneID:       pane.PaneID,
+		Session:      pane.SessionName,
+		WindowIndex:  pane.WindowIndex,
+		WindowName:   pane.WindowName,
+		CWD:          pane.CWD,
+		PrevCmd:      agent,
+		Agent:        agent,
+		UUID:         uuid,
+		UUIDSource:   uuidSource(agent),
+		WindowLayout: pane.WindowLayout,
+		Zoomed:       boolFlag(pane.Zoomed),
+		PaneActive:   boolFlag(pane.PaneActive),
+		WindowActive: boolFlag(pane.WindowActive),
+		CapturedAt:   time.Now().UTC().Format(time.RFC3339),
 	}
+}
+
+// boolFlag renders a bool as the 0/1 the shell emitter writes.
+func boolFlag(b bool) int {
+	if b {
+		return 1
+	}
+	return 0
 }
 
 func (m *Model) rebuildRows() {
@@ -639,6 +651,12 @@ func (m Model) viewReview() string {
 	title := fmt.Sprintf("review · %s · %s:%d · %s",
 		p.PaneID, p.SessionName, p.WindowIndex, p.WindowName)
 	meta := fmt.Sprintf("cwd: %s   cmd: %s", shortenHome(p.CWD), p.CurrentCommand)
+	if p.PaneActive {
+		meta += "   [active]"
+	}
+	if p.Zoomed {
+		meta += "   [zoomed]"
+	}
 
 	body := m.scrollback
 	if body == "" {

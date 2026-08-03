@@ -292,10 +292,12 @@ bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent 
 bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
+bash tests/necro-snapshot-active-zoom-field-test.sh  # records carry zoomed/pane_active/window_active (0 when tmux omits them)
 bash tests/necro-snapshot-no-tty-guard-test.sh    # exit-capture refused without a real controlling tty
 bash tests/necro-snapshot-default-idle-only-test.sh  # bare invocation defaults to idle-only, no pane disruption
 bash tests/necro-snapshot-empty-answer-aborts-test.sh  # EOF on the exit prompt aborts (q), never falls through to exit-keys
 bash tests/necro-restore-layout-test.sh           # restore replays window_layout via select-layout
+bash tests/necro-restore-zoom-active-test.sh      # restore re-applies active pane, zoom (after layout), active window
 bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)
 bash tests/necro-apply-resume-message-test.sh     # apply sends the post-resume message too
 bash tests/necro-restore-bash32-test.sh           # restore runs clean under stock /bin/bash 3.2 (no declare -A)
@@ -337,6 +339,9 @@ Key things to verify after any change to restore/snapshot:
   `claude`/`codex --resume` back-to-back
 - restored multi-pane windows get their saved layout re-applied
   (`select-layout`) only when the live pane count matches the snapshot's
+- the saved active pane/window and zoom state come back too — zoom re-applied
+  AFTER the layout replay (`select-layout` unzooms), and only for windows this
+  run created/claimed, never a live reused window
 - resumed panes receive the configured post-resume message (default `continue`)
   after the resume, and none when the message is set empty
 

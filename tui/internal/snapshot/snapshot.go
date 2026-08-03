@@ -27,6 +27,10 @@ type Record struct {
 	Agent          string `json:"agent"`
 	UUID           string `json:"uuid"`
 	UUIDSource     string `json:"uuid_source,omitempty"`
+	WindowLayout   string `json:"window_layout,omitempty"`
+	Zoomed         int    `json:"zoomed"`        // 0/1, matches the shell emitter
+	PaneActive     int    `json:"pane_active"`   // 0/1
+	WindowActive   int    `json:"window_active"` // 0/1
 	CapturedAt     string `json:"captured_at"`
 	FirstUser      string `json:"first_user"`
 	LastAssistant  string `json:"last_assistant"`
