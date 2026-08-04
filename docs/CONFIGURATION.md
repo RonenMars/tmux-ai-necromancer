@@ -8,7 +8,7 @@ loads TPM:
 
 ```tmux
 set -g @necromancer_interval         '5'             # minutes between autosaves
-set -g @necromancer_max_snapshots    '20'            # autosave files to keep
+set -g @necromancer_max_snapshots    '288'           # autosave files to keep (~24h at 5m interval)
 set -g @necromancer_agents           'claude codex'  # which agents to track
 set -g @necromancer_restore_key      'ai'            # prefix chord for restore popup (two letters → prefix+a then i; a single key name still works)
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live

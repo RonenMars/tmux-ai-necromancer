@@ -100,7 +100,7 @@ section "Effective configuration"
 if [ "$HAVE_SERVER" = "1" ]; then
   echo "  agents             $(necro_tmux_option @necromancer_agents 'claude codex')"
   echo "  interval           $(necro_tmux_option @necromancer_interval 5) min"
-  echo "  max_snapshots      $(necro_tmux_option @necromancer_max_snapshots 20)"
+  echo "  max_snapshots      $(necro_tmux_option @necromancer_max_snapshots 288)"
   echo "  autosave_tick      $(necro_tmux_option @necromancer_autosave_tick 60) s"
   echo "  watch_tick         $(necro_tmux_option @necromancer_watch_tick 1) s"
   echo "  claude_commands    $(necro_tmux_option @necromancer_claude_commands 'claude')"

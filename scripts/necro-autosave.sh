@@ -25,7 +25,7 @@ LOG="$SNAP_DIR/autosave.log"
 mkdir -p "$SNAP_DIR"
 
 interval_minutes="$(necro_tmux_option @necromancer_interval 5)"
-max_snapshots="$(necro_tmux_option @necromancer_max_snapshots 20)"
+max_snapshots="$(necro_tmux_option @necromancer_max_snapshots 288)"
 interval_seconds=$(( interval_minutes * 60 ))
 necro_log_event "autosave" "schedule" "interval_minutes=$interval_minutes" "max_snapshots=$max_snapshots"
 
