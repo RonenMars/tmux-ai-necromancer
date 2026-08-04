@@ -9,7 +9,7 @@
 #   @necromancer_max_snapshots   autosave files to keep               (default 288 ≈ 24h @ 5m)
 #   @necromancer_agents          space-separated agent list           (default "claude codex")
 #   @necromancer_snapshot_dir    where snapshots live  (default ~/.claude/tmux-snapshots)
-#   @necromancer_restore_key     prefix key to run restore            (default R)
+#   @necromancer_restore_key     prefix chord to run restore          (default ai)
 #   @necromancer_log_dir         where script logs live              (default ~/.tmux-ai-necromancer-logs)
 #   @necromancer_debug           write per-command debug logs        (default off)
 #   @necromancer_autosave_tick   daemon polling interval in seconds   (default 60)
@@ -42,7 +42,7 @@ set_default "@necromancer_max_snapshots"   "288"
 set_default "@necromancer_agents"          "claude codex"
 set_default "@necromancer_claude_commands" "claude"
 set_default "@necromancer_codex_commands"  "codex codex-*"
-set_default "@necromancer_restore_key"     "R"
+set_default "@necromancer_restore_key"     "ai"
 set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_debug"           "off"
 set_default "@necromancer_autosave_tick"   "60"
@@ -69,8 +69,21 @@ if [ "$clean_status_right" != "$status_right" ]; then
   necro_log_event "plugin" "remove_legacy_status_hooks"
 fi
 
-# Bind <prefix> <restore_key> to the restore script in a popup.
+# Bind restore in a popup. @necromancer_restore_key is either:
+#   - a two-letter chord (default "ai", also "a i") → prefix + first, then second
+#     via a dedicated key-table (so prefix+a alone waits for the next stroke)
+#   - a single key name (e.g. R, N, C-r) → classic prefix + key
 restore_key="$(tmux show-option -gqv @necromancer_restore_key 2>/dev/null)"
-[ -z "$restore_key" ] && restore_key="R"
-tmux bind-key "$restore_key" run-shell "tmux display-popup -E '$CURRENT_DIR/scripts/necro-restore.sh; echo; echo Press enter to close; read'"
+[ -z "$restore_key" ] && restore_key="ai"
+restore_cmd="tmux display-popup -E '$CURRENT_DIR/scripts/necro-restore.sh; echo; echo Press enter to close; read'"
+# Compact whitespace so "a i" and "ai" share one path. bash 3.2-safe (no ${var// }).
+restore_compact="$(printf '%s' "$restore_key" | tr -d '[:space:]')"
+if [ "${#restore_compact}" -eq 2 ] && printf '%s' "$restore_compact" | grep -Eq '^[A-Za-z0-9]{2}$'; then
+  restore_k1="$(printf '%s' "$restore_compact" | cut -c1)"
+  restore_k2="$(printf '%s' "$restore_compact" | cut -c2)"
+  tmux bind-key -T prefix "$restore_k1" switch-client -T necro-restore
+  tmux bind-key -T necro-restore "$restore_k2" run-shell "$restore_cmd"
+else
+  tmux bind-key "$restore_key" run-shell "$restore_cmd"
+fi
 necro_log_event "plugin" "bind_restore" "key=$restore_key"

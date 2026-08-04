@@ -21,7 +21,7 @@ case "$1" in
     case "${3:-}" in
       status-right) printf '#(/Users/ronenmars/.tmux/plugins/tmux-ai-necromancer/scripts/necro-status.sh)#(/Users/ronenmars/.tmux/plugins/tmux-ai-necromancer/scripts/necro-watch.sh)BASE' ;;
       @necromancer_debug) printf 'off' ;;
-      @necromancer_restore_key) printf 'R' ;;
+      @necromancer_restore_key) printf 'ai' ;;
       *) printf '' ;;
     esac
     ;;

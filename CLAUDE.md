@@ -307,6 +307,7 @@ bash tests/necro-doctor-test.sh                   # doctor counts snapshot recor
 bash tests/necro-autosave-stale-lock-test.sh      # the autosave work lock self-heals; a live owner is still respected
 bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
+bash tests/necro-restore-keybind-test.sh          # restore binds prefix+ai via a key-table; single-key override still works
 bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot
 bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots
 bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events

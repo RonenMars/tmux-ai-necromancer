@@ -10,7 +10,7 @@ loads TPM:
 set -g @necromancer_interval         '5'             # minutes between autosaves
 set -g @necromancer_max_snapshots    '288'           # autosave files to keep (~24h at 5m interval)
 set -g @necromancer_agents           'claude codex'  # which agents to track
-set -g @necromancer_restore_key      'R'             # prefix key for restore popup
+set -g @necromancer_restore_key      'ai'            # prefix chord for restore popup (two letters → prefix+a then i; a single key name still works)
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
@@ -37,7 +37,7 @@ file is re-read. How much you need to reload depends on the option:
 | Options | To apply |
 |---|---|
 | Everything except the two below | `tmux source-file ~/.tmux.conf` — scripts read these at each run |
-| `@necromancer_restore_key` | Same, then re-run the plugin file (`prefix + I`, or restart tmux). The old key stays bound until the server restarts. |
+| `@necromancer_restore_key` | Same, then re-run the plugin file (`prefix + I`, or restart tmux). The old key (and any previous chord's first key) stays bound until the server restarts. Two letters (`ai` or `a i`) bind a key-table chord; a single key name (`R`, `N`, `C-r`, …) binds the classic one-shot form. |
 | `@necromancer_autosave_tick`, `@necromancer_watch_tick` | The daemons read their tick once at startup and a re-source is a no-op while they hold their lock. Restart them: `pkill -9 -f 'necro-.*-daemon\.sh'; tmux source-file ~/.tmux.conf` |
 
 `-9` is deliberate in that last one. On a plain `TERM` the daemon's cleanup trap
