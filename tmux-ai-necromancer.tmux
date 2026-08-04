@@ -6,7 +6,7 @@
 #
 # User-tunable options (set BEFORE the run-shell that sources tpm, in tmux.conf):
 #   @necromancer_interval        minutes between autosaves            (default 5)
-#   @necromancer_max_snapshots   autosave files to keep               (default 20)
+#   @necromancer_max_snapshots   autosave files to keep               (default 288 ≈ 24h @ 5m)
 #   @necromancer_agents          space-separated agent list           (default "claude codex")
 #   @necromancer_snapshot_dir    where snapshots live  (default ~/.claude/tmux-snapshots)
 #   @necromancer_restore_key     prefix key to run restore            (default R)
@@ -38,7 +38,7 @@ set_default() {
 }
 
 set_default "@necromancer_interval"        "5"
-set_default "@necromancer_max_snapshots"   "20"
+set_default "@necromancer_max_snapshots"   "288"
 set_default "@necromancer_agents"          "claude codex"
 set_default "@necromancer_claude_commands" "claude"
 set_default "@necromancer_codex_commands"  "codex codex-*"
