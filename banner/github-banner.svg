@@ -142,10 +142,10 @@
     <tspan x="176" y="482" fill="#8b94a3">restore</tspan>
   </text>
   <!-- keycap -->
-  <rect x="266" y="462" width="104" height="28" rx="4"
+  <rect x="266" y="462" width="128" height="28" rx="4"
     fill="#12151f" stroke="#2a3142" stroke-width="1"/>
   <text x="275" y="481"
     font-family="'Roboto Mono',ui-monospace,'SFMono-Regular',Menlo,Consolas,monospace"
-    font-size="14" fill="#c4ccd6">prefix + <tspan fill="#00ff8c" font-weight="700">R</tspan></text>
+    font-size="14" fill="#c4ccd6">prefix + <tspan fill="#00ff8c" font-weight="700">a i</tspan></text>
   </g>
 </svg>

@@ -1,7 +1,7 @@
 import { SectionHead } from './Features';
 
 const binds = [
-  { keys: ['Prefix', 'R'], tone: 'green', label: 'Restore latest snapshot', sub: 'popup' },
+  { keys: ['Prefix', 'a', 'i'], tone: 'green', label: 'Restore latest snapshot', sub: 'popup' },
   { keys: ['Prefix', 'I'], tone: 'azure', label: 'Install via TPM', sub: 'tpm' },
 ];
 
@@ -34,7 +34,7 @@ function Keycap({ children, tone = 'neutral' }) {
 export default function Keybindings() {
   return (
     <section id="resources" style={{ padding: '80px 28px', maxWidth: 1200, margin: '0 auto' }}>
-      <SectionHead eyebrow="// keybindings & commands" title="Two keys. The rest is muscle memory." />
+      <SectionHead eyebrow="// keybindings & commands" title="prefix + ai. The rest is muscle memory." />
       <div className="grid-keybindings" style={{
         display: 'grid', gridTemplateColumns: '0.85fr 1.15fr', gap: 40,
         marginTop: 44, alignItems: 'start',
@@ -47,9 +47,12 @@ export default function Keybindings() {
               borderRadius: 'var(--radius-md)',
             }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <Keycap tone="neutral">{b.keys[0]}</Keycap>
-                <span style={{ color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>+</span>
-                <Keycap tone={b.tone}>{b.keys[1]}</Keycap>
+                {b.keys.map((k, i) => (
+                  <span key={`${k}-${i}`} style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                    {i > 0 && <span style={{ color: 'var(--text-4)', fontFamily: 'var(--font-mono)' }}>+</span>}
+                    <Keycap tone={i === 0 ? 'neutral' : b.tone}>{k}</Keycap>
+                  </span>
+                ))}
               </div>
               <div>
                 <div style={{ fontSize: 14, color: 'var(--text-1)', fontWeight: 600 }}>{b.label}</div>

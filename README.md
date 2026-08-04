@@ -47,7 +47,7 @@ That's it — the autosave daemon starts immediately. See
 
 | Keys | Action |
 |---|---|
-| `prefix + R` | Restore latest snapshot (popup) |
+| `prefix + a i` | Restore latest snapshot (popup) |
 | `necro-menu` | Browse/restore/cleanup snapshots, prep for reboot |
 | `necro-doctor.sh` | Check the plugin's health (read-only) |
 

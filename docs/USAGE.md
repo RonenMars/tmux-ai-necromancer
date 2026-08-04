@@ -2,7 +2,7 @@
 
 | Action | Command / key |
 |---|---|
-| Restore latest snapshot | `prefix + R` (popup), or `necro-restore.sh` |
+| Restore latest snapshot | `prefix + a i` (popup), or `necro-restore.sh` |
 | Manual snapshot (no disruption, default) | `necro-snapshot.sh` |
 | Manual snapshot (interactive exit-capture) | `necro-snapshot.sh --interactive` |
 | Restore a specific snapshot | `necro-restore.sh <file.jsonl>` |
