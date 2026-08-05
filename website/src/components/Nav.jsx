@@ -33,7 +33,12 @@ export default function Nav() {
         borderBottom: '1px solid var(--line-faint)',
       }}>
         <a href="#top" style={{ display: 'flex', alignItems: 'center', gap: 11, textDecoration: 'none' }}>
-          <img src="/skull-mark.png" alt="" width="34" height="34" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }} />
+          <img
+            src="/logo-mark-nav.png"
+            alt=""
+            height="38"
+            style={{ height: 38, width: 'auto', display: 'block', filter: 'drop-shadow(0 0 8px rgba(0,255,140,0.35))' }}
+          />
           <span style={{
             fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 16,
             letterSpacing: '-0.02em', color: 'var(--necro-green)', textTransform: 'lowercase',
