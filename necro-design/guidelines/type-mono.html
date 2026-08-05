@@ -1,0 +1,16 @@
+<!-- @dsCard group="Type" viewport="700x210" name="Mono & Code" subtitle="Roboto Mono — terminals, code blocks, labels" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+  body{margin:0;background:var(--bg-base);padding:28px;font-family:var(--font-mono)}
+  .eyebrow{font-size:12px;text-transform:uppercase;letter-spacing:.12em;color:var(--azure-circuit);margin-bottom:14px}
+  pre{margin:0;background:var(--surface-terminal);border:1px solid var(--border-green);border-radius:8px;padding:16px;font-size:13px;line-height:1.7;color:var(--text-terminal);overflow:auto}
+  .c{color:var(--text-muted)} .k{color:var(--azure-circuit)} .g{color:var(--necro-green)}
+</style></head><body>
+  <div class="eyebrow">› Roboto Mono · uppercase eyebrow · 0.12em</div>
+  <pre><span class="c"># resurrect a dead session</span>
+<span class="k">function</span> <span class="g">tmux</span>() {
+  necro-restore.sh --dry-run
+  claude --resume <span class="g">&lt;uuid&gt;</span>
+}</pre>
+</body></html>

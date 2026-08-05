@@ -1,0 +1,42 @@
+/* tmux-ai-necromancer — Effects: radii, borders, shadows, glows, motion */
+:root {
+  /* Corner radii — sharp, terminal-flavored. Nothing pill-soft except chips. */
+  --radius-xs: 2px;
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+  --radius-xl: 14px;
+  --radius-pill: 999px;
+
+  /* Border widths */
+  --bw-hair: 1px;
+  --bw-thick: 2px;
+
+  /* Elevation shadows (cool, near-black — sit on the void) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 6px 18px rgba(0, 0, 0, 0.55);
+  --shadow-lg: 0 18px 48px rgba(0, 0, 0, 0.6);
+
+  /* Signature glows — the "reanimation" effect */
+  --glow-green-sm: 0 0 0 1px rgba(0,255,140,0.25), 0 0 12px rgba(0,255,140,0.25);
+  --glow-green-md: 0 0 0 1px rgba(0,255,140,0.35), 0 0 28px rgba(0,255,140,0.30);
+  --glow-green-lg: 0 0 60px rgba(0,255,140,0.40);
+  --glow-azure-sm: 0 0 0 1px rgba(0,212,255,0.30), 0 0 14px rgba(0,212,255,0.28);
+  --glow-azure-md: 0 0 0 1px rgba(0,212,255,0.40), 0 0 30px rgba(0,212,255,0.30);
+  --text-glow-green: 0 0 10px rgba(0,255,140,0.55);
+  --text-glow-azure: 0 0 10px rgba(0,212,255,0.50);
+
+  /* Focus ring */
+  --ring: 0 0 0 2px var(--void-900), 0 0 0 4px var(--necro-green);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);   /* @kind other */
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1); /* @kind other */
+  --dur-fast: 120ms;  /* @kind other */
+  --dur-base: 200ms;  /* @kind other */
+  --dur-slow: 400ms;  /* @kind other */
+
+  /* Decorative backgrounds */
+  --grid-line: rgba(0, 255, 140, 0.05);
+  --scanline: rgba(0, 255, 140, 0.025);
+}

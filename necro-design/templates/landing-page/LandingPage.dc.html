@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<!-- @template name="Landing Page" description="tmux-ai-necromancer marketing landing page — hero terminal, feature grid, keybindings" -->
+<helmet>
+<script src="./ds-base.js"></script>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;700&display=swap" />
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#0a0a14;color:#ecedf3;font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
+  .necro-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(0,255,140,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(0,255,140,.05) 1px,transparent 1px);background-size:48px 48px;-webkit-mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 35%,transparent 80%);mask-image:radial-gradient(ellipse 90% 60% at 50% 0%,#000 35%,transparent 80%)}
+  .necro-glow{position:fixed;top:-200px;left:-120px;width:560px;height:560px;z-index:0;pointer-events:none;background:radial-gradient(circle,rgba(0,255,140,.12),transparent 70%)}
+</style>
+</helmet>
+
+<div class="necro-grid"></div>
+<div class="necro-glow"></div>
+
+<div style="position:relative;z-index:1">
+  <!-- nav -->
+  <header style="display:flex;align-items:center;justify-content:space-between;padding:18px 48px;border-bottom:1px solid rgba(255,255,255,.07);position:sticky;top:0;background:rgba(10,10,20,.72);backdrop-filter:blur(12px);z-index:50">
+    <div style="display:flex;align-items:center;gap:12px">
+      <span style="font-family:'Roboto Mono',monospace;color:#00ff8c;font-size:22px;text-shadow:0 0 10px rgba(0,255,140,.55)">›_</span>
+      <span style="font-family:'Montserrat',sans-serif;font-weight:800;font-size:15px;color:#00ff8c">tmux-<span style="color:#00d4ff">ai</span>-necromancer</span>
+    </div>
+    <nav style="display:flex;align-items:center;gap:30px">
+      <a href="#" style="color:#00ff8c;font-weight:600;font-size:14px;text-decoration:none;border-bottom:2px solid #00ff8c;padding-bottom:4px">Home</a>
+      <a href="#" style="color:#aaaaaa;font-weight:600;font-size:14px;text-decoration:none">Features</a>
+      <a href="#" style="color:#aaaaaa;font-weight:600;font-size:14px;text-decoration:none">Resources</a>
+      <a href="#" style="color:#aaaaaa;font-weight:600;font-size:14px;text-decoration:none">Terminal</a>
+      <x-import component-from-global-scope="DesignSystem_7d9b63.Button" variant="primary" size="sm" hint-size="90px,34px">Sign Up</x-import>
+    </nav>
+  </header>
+
+  <!-- hero -->
+  <section style="display:grid;grid-template-columns:1fr 1fr;gap:56px;align-items:center;max-width:1280px;margin:0 auto;padding:72px 48px 56px">
+    <div>
+      <x-import component-from-global-scope="DesignSystem_7d9b63.Badge" tone="data" dot="{{ true }}" hint-size="220px,28px">TPM-compatible · multi-agent</x-import>
+      <h1 style="margin:24px 0 0;font-family:'Montserrat',sans-serif;font-weight:900;font-size:64px;line-height:1.02;letter-spacing:-.02em;color:#00ff8c">tmux-<span style="color:#00d4ff">ai</span>-necromancer</h1>
+      <p style="margin:20px 0 0;max-width:460px;font-size:19px;line-height:1.55;color:#aaaaaa">Resurrecting dead coding agents. Never lose your agent's train of thought — restore your entire terminal exactly where you left off.</p>
+      <div style="display:flex;gap:16px;margin-top:36px;flex-wrap:wrap">
+        <x-import component-from-global-scope="DesignSystem_7d9b63.Button" variant="primary" size="lg" glow="{{ true }}" hint-size="190px,52px">› Restore Session</x-import>
+        <x-import component-from-global-scope="DesignSystem_7d9b63.Button" variant="secondary" size="lg" hint-size="150px,52px">Read the Docs</x-import>
+      </div>
+      <div style="margin-top:28px;font-family:'Roboto Mono',monospace;font-size:13px;color:#6b6b7b"><span style="color:#00ff8c">$</span> set -g @plugin 'RonenMars/tmux-ai-necromancer'</div>
+    </div>
+    <x-import component-from-global-scope="DesignSystem_7d9b63.TerminalWindow" title="necromancer — session 0" glow="{{ true }}" status-left="[necromancer] reanimating" status-right="2 panes · ~/dev" hint-size="100%,300px">
+      <div style="font-family:'Roboto Mono',monospace">
+        <div style="color:#6b6b7b">$ necro-restore.sh</div>
+        <div><span style="color:#00ff8c;text-shadow:0 0 10px rgba(0,255,140,.55);letter-spacing:.18em;font-weight:700">RESTORING</span> claude --resume a1b2c3…</div>
+        <div style="color:#00d4ff;margin-top:6px">→ codex resume 9f8e7d</div>
+        <div style="color:#6b6b7b">→ reanimated 12 panes across 4 sessions</div>
+      </div>
+    </x-import>
+  </section>
+
+  <!-- feature grid -->
+  <section style="max-width:1280px;margin:0 auto;padding:24px 48px 72px;display:grid;grid-template-columns:repeat(4,1fr);gap:20px">
+    <x-import component-from-global-scope="DesignSystem_7d9b63.FeatureCard" accent="green" title="Automatic Session Checkpointing" hint-size="100%,200px">Walks every tmux pane on a timer and records each agent + resumable session id — in the background, off the status bar.</x-import>
+    <x-import component-from-global-scope="DesignSystem_7d9b63.FeatureCard" accent="azure" title="AI Agent Continuity" hint-size="100%,200px">Preserves and resumes live Claude Code &amp; Codex loops across crashes and machine restarts. One adapter file per agent.</x-import>
+    <x-import component-from-global-scope="DesignSystem_7d9b63.FeatureCard" accent="green" title="Process Serialization" hint-size="100%,200px">Auto-saves tmux windows, panes, and directory states to a JSONL snapshot. Idempotent restore fills gaps, never duplicates.</x-import>
+    <x-import component-from-global-scope="DesignSystem_7d9b63.FeatureCard" accent="azure" title="Boot-Time Reanimation" hint-size="100%,200px">Pairs with tmux-resurrect + continuum to bring your whole layout — and every agent — back automatically after a reboot.</x-import>
+  </section>
+
+  <!-- keybindings -->
+  <section style="max-width:1200px;margin:0 auto;padding:8px 48px 80px">
+    <h2 style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:32px;margin:0 0 8px">Keybindings</h2>
+    <p style="color:#6b6b7b;margin:0 0 28px;font-family:'Roboto Mono',monospace;font-size:14px">Set in <span style="color:#00d4ff">~/.tmux.conf</span> before TPM loads.</p>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
+      <x-import component-from-global-scope="DesignSystem_7d9b63.Card" interactive="{{ true }}" hint-size="100%,140px">
+        <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboCheckpoint }}" hint-size="160px,40px"></x-import>
+        <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Checkpoint</div>
+        <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Manual snapshot of every live pane</div>
+      </x-import>
+      <x-import component-from-global-scope="DesignSystem_7d9b63.Card" interactive="{{ true }}" hint-size="100%,140px">
+        <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboRestore }}" hint-size="160px,40px"></x-import>
+        <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Restore</div>
+        <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Reanimate the latest snapshot (popup)</div>
+      </x-import>
+      <x-import component-from-global-scope="DesignSystem_7d9b63.Card" interactive="{{ true }}" hint-size="100%,140px">
+        <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboContinue }}" hint-size="160px,40px"></x-import>
+        <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Continue</div>
+        <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Resume the focused agent in place</div>
+      </x-import>
+    </div>
+  </section>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    return {
+      comboCheckpoint: [{ label: 'Prefix' }, { label: 'n', tone: 'green' }],
+      comboRestore: [{ label: 'Prefix' }, { label: 'R', tone: 'green' }],
+      comboContinue: [{ label: 'Prefix' }, { label: 'c', tone: 'azure' }],
+    };
+  }
+}
+</script>
+</body>
+</html>

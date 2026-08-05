@@ -1,0 +1,42 @@
+/* tmux-ai-necromancer — Typography tokens
+   Two families only: Montserrat (display/UI) + Roboto Mono (code/terminal). */
+:root {
+  --font-display: 'Montserrat', system-ui, sans-serif; /* wordmark, headings */
+  --font-body:    'Montserrat', system-ui, sans-serif; /* UI + prose         */
+  --font-mono:    'Roboto Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  /* Weights */
+  --fw-regular: 400;   /* @kind other */
+  --fw-medium:  500;   /* @kind other */
+  --fw-semibold:600;   /* @kind other */
+  --fw-bold:    700;   /* @kind other */
+  --fw-extrabold:800;  /* @kind other */
+  --fw-black:   900;   /* @kind other */
+
+  /* Type scale (1.250 major-third, 16px base) */
+  --fs-caption: 0.75rem;   /* 12px */
+  --fs-small:   0.875rem;  /* 14px */
+  --fs-body:    1rem;      /* 16px */
+  --fs-lead:    1.125rem;  /* 18px */
+  --fs-h5:      1.25rem;   /* 20px */
+  --fs-h4:      1.5rem;    /* 24px */
+  --fs-h3:      2rem;      /* 32px */
+  --fs-h2:      2.75rem;   /* 44px */
+  --fs-h1:      3.75rem;   /* 60px */
+  --fs-display: 5.5rem;    /* 88px — hero wordmark */
+
+  /* Line heights */
+  --lh-tight:   1.05;  /* @kind other */
+  --lh-snug:    1.2;   /* @kind other */
+  --lh-normal:  1.5;   /* @kind other */
+  --lh-relaxed: 1.7;   /* @kind other */
+
+  /* Letter spacing */
+  --ls-tight:   -0.02em; /* @kind other */
+  --ls-normal:  0;       /* @kind other */
+  --ls-wide:    0.04em;  /* @kind other */
+  --ls-wider:   0.12em;  /* @kind other */   /* eyebrows / labels — uppercase mono */
+
+  /* Semantic roles */
+  --text-eyebrow-transform: uppercase;
+}
