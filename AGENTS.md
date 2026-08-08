@@ -77,3 +77,40 @@ list-panes`, `tmux show-option`.
 - Conventional-commit titles (`feat:`, `fix:`, `docs:`, …).
 - No AI attribution in commits or PRs.
 - Branch → PR → squash-merge. Never commit to `main` directly.
+
+## Cursor Cloud specific instructions
+
+The Cloud VM is **Ubuntu/Linux with GNU coreutils**, but this plugin targets
+**macOS (bash 3.2, BSD tools)**. Toolchain is preinstalled: `bash`, `python3`,
+`jq`, `tmux 3.5a`, `go`, `node`+`npm`. The startup update script only refreshes
+language deps (`tui` Go modules, `website` npm) — the bash plugin itself needs
+no install.
+
+Three components, each run as documented elsewhere:
+
+- **Core plugin (bash)** — main product. Tests: the isolated loop in the
+  *Testing* section above. Live snapshot→restore: the `tmux -L necrotest` +
+  `mktemp -d` pattern in `CLAUDE.md`.
+- **TUI (Go)** — `tui/`. `make build` / `make test` / `make run` (see
+  `tui/README.md`).
+- **Website (Vite + React)** — `website/`, entirely separate from the plugin.
+  `npm run dev` (serves on `http://localhost:5173/`), `npm run lint`,
+  `npm run build`.
+
+Two **Linux-only, pre-existing** gotchas — not regressions, do not "fix" them
+as part of unrelated work:
+
+- **6 of 47 bash tests fail on this VM** purely from BSD-vs-GNU tool
+  differences: `necro-doctor-test`, `necro-watch-lock-test`,
+  `necro-autosave-stale-lock-test`, `necro-agent-min-epoch-filter-test`,
+  `necro-agent-codex-min-epoch-test` all hit `stat -f %m` (BSD) which on GNU
+  `stat` prints filesystem info to stdout before failing, contaminating the
+  `|| stat -c %Y` fallback; `necro-snapshot-empty-answer-aborts-test` uses the
+  util-linux `script` whose flags differ from BSD `script`. The other 41 pass,
+  and the whole restore/snapshot engine works on Linux.
+- **The TUI's live pane table shows 0 rows on tmux ≥ 3.5.** `list-panes -F`
+  uses an ASCII Unit-Separator (`0x1f`) between fields; tmux 3.5a escapes
+  control bytes in format output to the literal string `\037`, so the Go
+  parser (splitting on a real `0x1f`) drops every row. The TUI still builds,
+  passes unit tests, renders, and loads snapshots — only the live join is
+  affected on this tmux. Printable separators (`|`, tab) are not escaped.
