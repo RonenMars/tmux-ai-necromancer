@@ -250,6 +250,21 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     `necro-watch-tick-cost-test.sh` asserts the count is equal for 1 and 12
     panes; without the priming it reads 7 and 29.
 
+    **The separator does not survive every tmux.** 3.5a escapes control bytes
+    in format output, so the separator comes back as the four literal
+    characters `\037`; measured on binaries built from source, 3.5a emits zero
+    raw `0x1f` bytes while 3.6 and 3.7b emit the byte. Under `IFS=$'\037'`
+    that matches nothing: the whole line lands in `pane_id`, `cmd` is empty,
+    no pane is recognised as an agent, and **UUID pinning is silently dead** —
+    the core mechanism gone with no error anywhere, on any box running 3.5a.
+    Both consumers unescape before splitting: `necro-watch.sh` via
+    `_necro_unescape_fs` (bash 3.2 pattern substitution, not a fork per tick,
+    so the O(1) tick cost above still holds) and the Go `parsePanes`, which
+    retries the escaped form only for a line that failed the field count.
+    Don't drop either on the grounds that tmux emits a raw byte — that starts
+    at 3.6. Covered by `necro-watch-escaped-separator-test.sh` and
+    `tui/internal/tmux/parse_panes_test.go`.
+
 ## Triaging a broken environment
 
 Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
@@ -286,6 +301,7 @@ bash tests/necro-agent-scrape-ps-resume-multichild-test.sh  # finds claude among
 bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts
 bash tests/necro-watch-priority-order-test.sh     # argv > scrollback > cursor-pop, end-to-end
 bash tests/necro-watch-tick-cost-test.sh          # a tick is O(1) tmux calls, not O(panes)
+bash tests/necro-watch-escaped-separator-test.sh  # pane walk survives tmux 3.5a escaping 0x1f to literal \037
 bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp doesn't drift across ticks
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit

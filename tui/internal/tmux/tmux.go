@@ -66,17 +66,40 @@ func ListPanes() ([]Pane, error) {
 		return nil, fmt.Errorf("tmux list-panes: %w", err)
 	}
 
+	panes, dropped := parsePanes(string(out))
+	debuglog.Event("tmux", "list_panes_complete", map[string]string{
+		"panes":   strconv.Itoa(len(panes)),
+		"dropped": strconv.Itoa(dropped),
+	})
+	return panes, nil
+}
+
+// escapedSep is what tmux 3.5a emits in place of a raw sep byte: it escapes
+// control bytes in format output, so the separator arrives as these four
+// characters and a plain Split yields one field per line. Measured on
+// binaries built from source: 3.5a emits zero raw 0x1f bytes; 3.6 and 3.7b
+// emit the byte. Both are handled so the pane table is not silently empty on
+// the older release.
+const escapedSep = `\037`
+
+// parsePanes turns `list-panes -F` output into panes, returning the number of
+// lines that could not be parsed. Split out from ListPanes so the escaped-
+// separator behaviour is testable without a live tmux server.
+func parsePanes(out string) ([]Pane, int) {
+	const sep = "\x1f"
 	var panes []Pane
 	dropped := 0
-	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
+	for _, line := range strings.Split(strings.TrimRight(out, "\n"), "\n") {
 		if line == "" {
 			continue
 		}
 		fields := strings.Split(line, sep)
 		if len(fields) != 10 {
-			// Wrong field count means the separator didn't survive tmux's
-			// format expansion. Counted rather than dropped in silence: the
-			// symptom is an empty table, identical to "no server running".
+			fields = strings.Split(strings.ReplaceAll(line, escapedSep, sep), sep)
+		}
+		if len(fields) != 10 {
+			// Counted rather than dropped in silence: the symptom is an empty
+			// table, identical to "no server running".
 			dropped++
 			continue
 		}
@@ -94,11 +117,7 @@ func ListPanes() ([]Pane, error) {
 			WindowActive:   fields[9] == "1",
 		})
 	}
-	debuglog.Event("tmux", "list_panes_complete", map[string]string{
-		"panes":   strconv.Itoa(len(panes)),
-		"dropped": strconv.Itoa(dropped),
-	})
-	return panes, nil
+	return panes, dropped
 }
 
 // CapturePane returns the last `lines` lines of the pane's visible content

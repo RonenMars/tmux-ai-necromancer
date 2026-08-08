@@ -97,7 +97,23 @@ NECRO_CURSOR_DIR="$(necro_watch_cursor_dir)"
 # after it. A non-whitespace IFS char delimits exactly one field, preserving
 # empties — which is the normal case here, since an unpinned pane has all five
 # options unset.
+#
+# tmux 3.5a escapes control bytes in format output, so the separator comes
+# back as the four literal characters \037 and IFS never matches: the whole
+# line lands in pane_id, cmd is empty, no pane is ever recognised as an agent,
+# and UUID pinning is silently dead. Measured on binaries built from source:
+# 3.5a emits zero raw 0x1f bytes; 3.6 and 3.7b emit the byte.
+# _necro_unescape_fs below restores the byte so both behaviours parse; the
+# substitution is bash 3.2 pattern replacement, not a fork per tick.
 NECRO_FS=$'\037'
+
+# Restore separators that tmux escaped to the literal string \037.
+_necro_unescape_fs() {
+  local text
+  text="$(cat)"
+  printf '%s\n' "${text//\\037/$NECRO_FS}"
+}
+
 while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent exited first_seen cwd; do
   [ -z "$pane_id" ] && continue
 
@@ -176,6 +192,6 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
     continue
   fi
 
-done < <(tmux list-panes -a -F "#{pane_id}${NECRO_FS}#{pane_current_command}${NECRO_FS}#{@necro_uuid}${NECRO_FS}#{@necro_cmd}${NECRO_FS}#{@necro_agent}${NECRO_FS}#{@necro_agent_exited}${NECRO_FS}#{@necro_pane_first_seen}${NECRO_FS}#{pane_current_path}" 2>/dev/null)
+done < <(tmux list-panes -a -F "#{pane_id}${NECRO_FS}#{pane_current_command}${NECRO_FS}#{@necro_uuid}${NECRO_FS}#{@necro_cmd}${NECRO_FS}#{@necro_agent}${NECRO_FS}#{@necro_agent_exited}${NECRO_FS}#{@necro_pane_first_seen}${NECRO_FS}#{pane_current_path}" 2>/dev/null | _necro_unescape_fs)
 
 exit 0
