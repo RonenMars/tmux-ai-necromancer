@@ -1,0 +1,67 @@
+<!-- @dsCard group="Website" viewport="1360x900" name="Landing Page" subtitle="Full tmux-ai-necromancer marketing site — hero, features, keybindings, install" -->
+<!-- @startingPoint section="Website" subtitle="tmux-ai-necromancer landing page" viewport="1360x900" -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tmux-ai-necromancer — Resurrect your AI coding sessions</title>
+<link rel="stylesheet" href="../../styles.css" />
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/lucide@1.30.0/dist/umd/lucide.min.js" integrity="sha384-Lehp/dEjQw2+58R4nCzfMqOECBJX6eElVUQwfl5Zu2ASFb94h94sxAx5NHZj4VTR" crossorigin="anonymous"></script>
+<script src="../../_ds_bundle.js"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{
+    background:var(--bg-base);
+    color:var(--text-primary);
+    font-family:var(--font-body);
+    -webkit-font-smoothing:antialiased;
+    position:relative;
+  }
+  /* circuit grid + corner glows backdrop */
+  body::before{
+    content:"";position:fixed;inset:0;z-index:0;pointer-events:none;
+    background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+    background-size:48px 48px;
+    mask-image:radial-gradient(ellipse 90% 60% at 50% 0%, #000 35%, transparent 80%);
+  }
+  body::after{
+    content:"";position:fixed;top:-200px;left:-120px;width:560px;height:560px;z-index:0;pointer-events:none;
+    background:radial-gradient(circle,rgba(0,255,140,0.12),transparent 70%);
+  }
+  #app{position:relative;z-index:1}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script type="text/babel" src="Nav.jsx"></script>
+<script type="text/babel" src="Hero.jsx"></script>
+<script type="text/babel" src="FeatureGrid.jsx"></script>
+<script type="text/babel" src="Keybindings.jsx"></script>
+<script type="text/babel" src="InstallShowcase.jsx"></script>
+<script type="text/babel" src="Footer.jsx"></script>
+<script type="text/babel">
+function App() {
+  const [active, setActive] = React.useState('Home');
+  const [restoring, setRestoring] = React.useState(false);
+  React.useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
+  const onRestore = () => { setRestoring(true); setTimeout(() => setRestoring(false), 2600); };
+  return (
+    <div>
+      <Nav active={active} onNav={setActive} />
+      <Hero onRestore={onRestore} restoring={restoring} />
+      <FeatureGrid />
+      <Keybindings />
+      <InstallShowcase />
+      <Footer />
+    </div>
+  );
+}
+ReactDOM.createRoot(document.getElementById('app')).render(<App />);
+</script>
+</body>
+</html>

@@ -1,0 +1,79 @@
+/* tmux-ai-necromancer — Color tokens
+   High-contrast dark theme. Necromancer green is the primary signal color;
+   azure circuit is the secondary accent; signal red is destructive only. */
+:root {
+  /* ---- Brand core (from the brand asset sheet) ---- */
+  --necro-green: #00ff8c;   /* Necromancer Green — primary, "alive" state   */
+  --midnight-void: #0a0a14; /* Midnight Void — canvas background            */
+  --azure-circuit: #00d4ff; /* Azure Circuit — secondary accent / data flow */
+  --ash-gray: #aaaaaa;      /* Ash Gray — muted body text                   */
+  --signal-red: #ff4d4d;    /* Signal Red — danger / destructive / dead     */
+
+  /* ---- Green ramp ---- */
+  --green-100: #c4ffe6;
+  --green-300: #6dffc0;
+  --green-500: #00ff8c;
+  --green-600: #00d977;
+  --green-700: #00b362;
+  --green-900: #064d31;
+  --green-glow: rgba(0, 255, 140, 0.45);
+
+  /* ---- Azure ramp ---- */
+  --azure-300: #7fe7ff;
+  --azure-500: #00d4ff;
+  --azure-700: #00a3c4;
+  --azure-glow: rgba(0, 212, 255, 0.40);
+
+  /* ---- Red ramp ---- */
+  --red-400: #ff7070;
+  --red-500: #ff4d4d;
+  --red-700: #c42f2f;
+
+  /* ---- Neutral / void ramp (cool, blue-black) ---- */
+  --void-950: #06060d;
+  --void-900: #0a0a14;
+  --void-850: #0e0e1a;
+  --void-800: #12121e;
+  --void-750: #16161f;
+  --void-700: #1c1c2a;
+  --void-600: #262636;
+  --void-500: #353548;
+  --ink-400: #6b6b7b;
+  --ink-300: #8a8a99;
+  --ink-200: #aaaaaa;
+  --ink-100: #d6d6e0;
+  --ink-50:  #ecedf3;
+  --white:   #ffffff;
+
+  /* ---- Semantic surfaces ---- */
+  --bg-base:      var(--void-900);
+  --bg-sunken:    var(--void-950);
+  --surface-card: var(--void-800);
+  --surface-raised: var(--void-750);
+  --surface-inset:  var(--void-850);
+  --surface-terminal: #0b0e10;     /* near-black terminal canvas, faint green cast */
+  --surface-terminal-chrome: #181a1d;
+
+  /* ---- Semantic text ---- */
+  --text-primary:   var(--ink-50);
+  --text-secondary: var(--ink-200);
+  --text-muted:     var(--ink-400);
+  --text-on-green:  #042b1c;        /* dark ink for use on green fills */
+  --text-accent:    var(--necro-green);
+  --text-link:      var(--azure-circuit);
+  --text-terminal:  var(--necro-green);
+
+  /* ---- Semantic borders ---- */
+  --border-subtle:  rgba(255, 255, 255, 0.07);
+  --border-default: rgba(255, 255, 255, 0.12);
+  --border-strong:  rgba(255, 255, 255, 0.20);
+  --border-green:   rgba(0, 255, 140, 0.35);
+  --border-azure:   rgba(0, 212, 255, 0.35);
+  --border-red:     rgba(255, 77, 77, 0.40);
+
+  /* ---- Semantic states ---- */
+  --state-alive:   var(--necro-green);
+  --state-data:    var(--azure-circuit);
+  --state-dead:    var(--signal-red);
+  --state-dormant: var(--ink-400);
+}

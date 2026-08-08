@@ -30,7 +30,13 @@ export default function Footer() {
       }}>
         <div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 11, marginBottom: 16 }}>
-            <img src="/skull-mark.png" alt="" width="32" height="32" style={{ borderRadius: 'var(--radius-sm)', border: '1px solid var(--line)' }} />
+            <img
+              src="/logo-mark-nav.png"
+              alt=""
+              width="50"
+              height="36"
+              style={{ height: 36, width: 'auto', display: 'block', filter: 'drop-shadow(0 0 8px rgba(0,255,140,0.35))' }}
+            />
             <span style={{
               fontFamily: 'var(--font-display)', fontWeight: 800, fontSize: 15,
               letterSpacing: '-0.02em', color: 'var(--necro-green)', textTransform: 'lowercase',

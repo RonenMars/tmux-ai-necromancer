@@ -1,0 +1,21 @@
+<!-- @dsCard group="Brand" viewport="700x180" name="Void Backdrop" subtitle="Circuit grid + scanlines + corner glow" -->
+<!DOCTYPE html><html><head><meta charset="utf-8"/>
+<link rel="stylesheet" href="../styles.css"/>
+<style>
+  html,body{margin:0;height:100%}
+  body{background:var(--bg-base);position:relative;overflow:hidden;font-family:var(--font-mono)}
+  .grid{position:absolute;inset:0;
+    background-image:linear-gradient(var(--grid-line) 1px,transparent 1px),linear-gradient(90deg,var(--grid-line) 1px,transparent 1px);
+    background-size:40px 40px}
+  .glow{position:absolute;width:340px;height:340px;border-radius:50%;
+    background:radial-gradient(circle,rgba(0,255,140,.18),transparent 70%);
+    top:-120px;left:-80px;filter:blur(8px)}
+  .glow2{position:absolute;width:300px;height:300px;border-radius:50%;
+    background:radial-gradient(circle,rgba(0,212,255,.12),transparent 70%);
+    bottom:-140px;right:-60px}
+  .lab{position:absolute;left:24px;bottom:20px;color:var(--text-secondary);font-size:12px}
+  .lab b{color:var(--necro-green)}
+</style></head><body>
+  <div class="grid"></div><div class="glow"></div><div class="glow2"></div>
+  <div class="lab"><b>--grid-line</b> 40px circuit grid · radial green/azure corner glows over <b>--bg-base</b></div>
+</body></html>
