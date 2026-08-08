@@ -108,9 +108,14 @@ as part of unrelated work:
   `|| stat -c %Y` fallback; `necro-snapshot-empty-answer-aborts-test` uses the
   util-linux `script` whose flags differ from BSD `script`. The other 41 pass,
   and the whole restore/snapshot engine works on Linux.
-- **The TUI's live pane table shows 0 rows on tmux ≥ 3.5.** `list-panes -F`
-  uses an ASCII Unit-Separator (`0x1f`) between fields; tmux 3.5a escapes
-  control bytes in format output to the literal string `\037`, so the Go
-  parser (splitting on a real `0x1f`) drops every row. The TUI still builds,
-  passes unit tests, renders, and loads snapshots — only the live join is
-  affected on this tmux. Printable separators (`|`, tab) are not escaped.
+- **The TUI's live pane table may show 0 rows on this VM.** Cause unconfirmed.
+  An earlier note here blamed tmux ≥ 3.5 escaping the ASCII Unit-Separator
+  (`0x1f`) that `list-panes -F` uses between fields; that does not reproduce —
+  on tmux 3.7b the separator round-trips as a raw byte (even inside a value)
+  and `ListPanes` parses every pane, and tmux's 3.5 changelog entry about
+  octal escapes covers input parsing and `list-keys` output, not `list-panes
+  -F`. Before assuming a parse bug, check the far likelier explanation: with
+  no tmux server on the default socket `ListPanes` returns zero panes and no
+  error, which looks identical. Read the `list_panes_complete` debug event —
+  it reports `server: absent` for that case and a `dropped` count when rows
+  actually fail to parse.

@@ -67,12 +67,17 @@ func ListPanes() ([]Pane, error) {
 	}
 
 	var panes []Pane
+	dropped := 0
 	for _, line := range strings.Split(strings.TrimRight(string(out), "\n"), "\n") {
 		if line == "" {
 			continue
 		}
 		fields := strings.Split(line, sep)
 		if len(fields) != 10 {
+			// Wrong field count means the separator didn't survive tmux's
+			// format expansion. Counted rather than dropped in silence: the
+			// symptom is an empty table, identical to "no server running".
+			dropped++
 			continue
 		}
 		idx, _ := strconv.Atoi(fields[2])
@@ -89,7 +94,10 @@ func ListPanes() ([]Pane, error) {
 			WindowActive:   fields[9] == "1",
 		})
 	}
-	debuglog.Event("tmux", "list_panes_complete", map[string]string{"panes": strconv.Itoa(len(panes))})
+	debuglog.Event("tmux", "list_panes_complete", map[string]string{
+		"panes":   strconv.Itoa(len(panes)),
+		"dropped": strconv.Itoa(dropped),
+	})
 	return panes, nil
 }
 
