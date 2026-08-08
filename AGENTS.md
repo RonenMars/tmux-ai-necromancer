@@ -97,8 +97,8 @@ Three components, each run as documented elsewhere:
   `npm run dev` (serves on `http://localhost:5173/`), `npm run lint`,
   `npm run build`.
 
-Two **Linux-only, pre-existing** gotchas — not regressions, do not "fix" them
-as part of unrelated work:
+Two environment gotchas. Neither is a regression in the plugin, and the first
+must not be "fixed" as part of unrelated work:
 
 - **6 of 47 bash tests fail on this VM** purely from BSD-vs-GNU tool
   differences: `necro-doctor-test`, `necro-watch-lock-test`,
@@ -108,14 +108,20 @@ as part of unrelated work:
   `|| stat -c %Y` fallback; `necro-snapshot-empty-answer-aborts-test` uses the
   util-linux `script` whose flags differ from BSD `script`. The other 41 pass,
   and the whole restore/snapshot engine works on Linux.
-- **The TUI's live pane table may show 0 rows on this VM.** Cause unconfirmed.
-  An earlier note here blamed tmux ≥ 3.5 escaping the ASCII Unit-Separator
-  (`0x1f`) that `list-panes -F` uses between fields; that does not reproduce —
-  on tmux 3.7b the separator round-trips as a raw byte (even inside a value)
-  and `ListPanes` parses every pane, and tmux's 3.5 changelog entry about
-  octal escapes covers input parsing and `list-keys` output, not `list-panes
-  -F`. Before assuming a parse bug, check the far likelier explanation: with
-  no tmux server on the default socket `ListPanes` returns zero panes and no
-  error, which looks identical. Read the `list_panes_complete` debug event —
-  it reports `server: absent` for that case and a `dropped` count when rows
-  actually fail to parse.
+- **tmux 3.5a escapes the `0x1f` field separator; 3.6 and later do not.**
+  `list-panes -F` renders the ASCII Unit Separator as the four literal
+  characters `\037`, so any consumer splitting on a real `0x1f` sees one field
+  per line. Measured on binaries built from source: 3.5a emits **zero** raw
+  `0x1f` bytes, 3.6 and 3.7b emit the raw byte. This is handled now — the Go
+  parser retries with the escaped form and `necro-watch.sh` unescapes before
+  its read loop — so the VM's tmux 3.5a is no longer a problem. Do not
+  "simplify" either unescape away on the grounds that tmux emits a raw byte;
+  that is only true from 3.6 on. Covered by
+  `tests/necro-watch-escaped-separator-test.sh` and
+  `tui/internal/tmux/parse_panes_test.go`.
+
+  If a pane table is empty anyway, read the `list_panes_complete` debug event
+  before theorising: it reports `server: absent` when no tmux server is
+  running on the default socket (`ListPanes` returns zero panes and no error,
+  which looks identical to a parse bug) and a `dropped` count when rows
+  genuinely fail to parse.
