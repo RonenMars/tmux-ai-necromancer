@@ -18,7 +18,7 @@ If the user invokes this skill without any other guidance, ask them what they wa
 - **Components:** read off `window.DesignSystem_7d9b63` after loading `_ds_bundle.js` (Button, Input, Badge, KeyCap/KeyCombo, Card, FeatureCard, TerminalWindow).
 - **Signature moves:** the green reanimation *glow*, the `TerminalWindow` surface, blinking `RESTORING`, pulsing status dots, the circuit-grid + corner-glow backdrop.
 - **Voice:** dry technical sysadmin with a death/undead metaphor; lowercase wordmark, UPPERCASE mono labels, real commands only, only the 🪦 emoji.
-- **Assets:** `assets/logo-mark.png`, `assets/brand-concept-sheet.png`.
+- **Assets:** `assets/logo-mark.png`; the brand concept sheet lives at the repo root as `assets/concept-design.png`.
 - **Reference UI kit:** `ui_kits/website/index.html` (the landing page).
 
 See `readme.md` for the full CONTENT FUNDAMENTALS, VISUAL FOUNDATIONS, and ICONOGRAPHY sections.

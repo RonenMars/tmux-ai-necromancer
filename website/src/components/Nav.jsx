@@ -36,6 +36,7 @@ export default function Nav() {
           <img
             src="/logo-mark-nav.png"
             alt=""
+            width="53"
             height="38"
             style={{ height: 38, width: 'auto', display: 'block', filter: 'drop-shadow(0 0 8px rgba(0,255,140,0.35))' }}
           />

@@ -1173,16 +1173,10 @@ function Keybindings() {
     combo: [{
       label: 'Prefix'
     }, {
-      label: 'n',
+      label: 'a',
       tone: 'green'
-    }],
-    name: 'Checkpoint',
-    desc: 'Manual snapshot of every live pane'
-  }, {
-    combo: [{
-      label: 'Prefix'
     }, {
-      label: 'R',
+      label: 'i',
       tone: 'green'
     }],
     name: 'Restore',
@@ -1191,11 +1185,11 @@ function Keybindings() {
     combo: [{
       label: 'Prefix'
     }, {
-      label: 'c',
+      label: 'I',
       tone: 'azure'
     }],
-    name: 'Continue',
-    desc: 'Resume the focused agent in place'
+    name: 'Install',
+    desc: 'Install the plugin via TPM'
   }];
   return /*#__PURE__*/React.createElement("section", {
     style: {
@@ -1225,7 +1219,7 @@ function Keybindings() {
   }, "~/.tmux.conf"), " before TPM loads."), /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'grid',
-      gridTemplateColumns: 'repeat(3, 1fr)',
+      gridTemplateColumns: 'repeat(2, 1fr)',
       gap: '18px'
     }
   }, rows.map(r => /*#__PURE__*/React.createElement(Card, {

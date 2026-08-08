@@ -11,7 +11,7 @@
 <helmet>
 <script src="./ds-base.js"></script>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=Roboto+Mono:wght@400;500;700&display=swap" />
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+<script src="https://unpkg.com/lucide@1.30.0/dist/umd/lucide.min.js" integrity="sha384-Lehp/dEjQw2+58R4nCzfMqOECBJX6eElVUQwfl5Zu2ASFb94h94sxAx5NHZj4VTR" crossorigin="anonymous"></script>
 <style>
   *{box-sizing:border-box}
   body{margin:0;background:#0a0a14;color:#ecedf3;font-family:'Montserrat',sans-serif;-webkit-font-smoothing:antialiased}
@@ -73,21 +73,16 @@
   <section style="max-width:1200px;margin:0 auto;padding:8px 48px 80px">
     <h2 style="font-family:'Montserrat',sans-serif;font-weight:700;font-size:32px;margin:0 0 8px">Keybindings</h2>
     <p style="color:#6b6b7b;margin:0 0 28px;font-family:'Roboto Mono',monospace;font-size:14px">Set in <span style="color:#00d4ff">~/.tmux.conf</span> before TPM loads.</p>
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:18px">
-      <x-import component-from-global-scope="DesignSystem_7d9b63.Card" interactive="{{ true }}" hint-size="100%,140px">
-        <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboCheckpoint }}" hint-size="160px,40px"></x-import>
-        <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Checkpoint</div>
-        <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Manual snapshot of every live pane</div>
-      </x-import>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:18px">
       <x-import component-from-global-scope="DesignSystem_7d9b63.Card" interactive="{{ true }}" hint-size="100%,140px">
         <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboRestore }}" hint-size="160px,40px"></x-import>
         <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Restore</div>
         <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Reanimate the latest snapshot (popup)</div>
       </x-import>
       <x-import component-from-global-scope="DesignSystem_7d9b63.Card" interactive="{{ true }}" hint-size="100%,140px">
-        <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboContinue }}" hint-size="160px,40px"></x-import>
-        <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Continue</div>
-        <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Resume the focused agent in place</div>
+        <x-import component-from-global-scope="DesignSystem_7d9b63.KeyCombo" keys="{{ comboInstall }}" hint-size="160px,40px"></x-import>
+        <div style="margin-top:18px;font-family:'Montserrat',sans-serif;font-weight:700;font-size:16px">Install</div>
+        <div style="color:#aaaaaa;font-size:13px;margin-top:4px">Install the plugin via TPM</div>
       </x-import>
     </div>
   </section>
@@ -97,9 +92,8 @@
 class Component extends DCLogic {
   renderVals() {
     return {
-      comboCheckpoint: [{ label: 'Prefix' }, { label: 'n', tone: 'green' }],
-      comboRestore: [{ label: 'Prefix' }, { label: 'R', tone: 'green' }],
-      comboContinue: [{ label: 'Prefix' }, { label: 'c', tone: 'azure' }],
+      comboRestore: [{ label: 'Prefix' }, { label: 'a', tone: 'green' }, { label: 'i', tone: 'green' }],
+      comboInstall: [{ label: 'Prefix' }, { label: 'I', tone: 'azure' }],
     };
   }
 }

@@ -33,6 +33,7 @@ export default function Footer() {
             <img
               src="/logo-mark-nav.png"
               alt=""
+              width="50"
               height="36"
               style={{ height: 36, width: 'auto', display: 'block', filter: 'drop-shadow(0 0 8px rgba(0,255,140,0.35))' }}
             />

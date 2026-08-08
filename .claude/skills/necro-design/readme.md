@@ -24,11 +24,11 @@ but they are recorded here so you can dig deeper:
   bash plugin + Go TUI. The `README.md`, `CLAUDE.md`, and `docs/agents.md` are
   the source of product copy, feature names, keybindings, and the supported-agent
   table. *Explore this repo to build more accurate product UIs.*
-- **Brand asset sheet:** `assets/brand-concept-sheet.png` — the strict visual
-  reference: dark theme, the five named colors, the logo, and a full landing-page
-  mockup (hero terminal, feature grid, keybindings, code blocks).
-- The repo itself has **no web frontend** — the website design is derived
-  entirely from the brand asset sheet.
+- **Brand asset sheet:** `assets/concept-design.png` at the repo root — the strict
+  visual reference: dark theme, the five named colors, the logo, and a full
+  landing-page mockup (hero terminal, feature grid, keybindings, code blocks).
+- The repo ships a React landing page under `website/` — treat it, not this kit,
+  as the source of truth for live product copy.
 
 > ⚠️ **Font substitution:** the brand sheet's wordmark is a heavy geometric
 > sans; we use **Montserrat 900** as the closest widely-available match, and
@@ -54,8 +54,8 @@ the copy leans into it without becoming campy.
   for filler: *dead* command prompts, *resurrect*, *reanimate*, *revive*,
   *seamless restore*, *train of thought*, *the void is empty* (empty state).
 - **Technically precise.** Real commands, real paths, real file formats appear in
-  copy verbatim: `claude --resume <uuid>`, `~/.claude/tmux-snapshots`, `prefix + R`,
-  JSONL. Never fake a command.
+  copy verbatim: `claude --resume <uuid>`, `~/.claude/tmux-snapshots`, `prefix + a i`,
+  JSONL. Never fake a command — check the plugin source before writing one.
 - **Emoji:** exactly one, the headstone 🪦, used as a brand bookend (title/footer).
   Do **not** sprinkle emoji through UI or features.
 - **Taglines are short and parallel:** "Resurrecting Dead Coding Agents. Seamless
@@ -129,7 +129,8 @@ real image is the logo mark; everything else is type, terminals, and glow.
 - **Primary icon set: [Lucide](https://lucide.dev)** (CDN), thin/consistent
   stroke — it matches the brand sheet's line-icons for the feature grid
   (`folder-check`, `brain-circuit`, `database`, `timer-reset`). Loaded via
-  `<script src="https://unpkg.com/lucide@latest/...">` then `lucide.createIcons()`.
+  `<script src="https://unpkg.com/lucide@1.30.0/...">` then `lucide.createIcons()`.
+  Always pin the version and carry an `integrity` hash — never `@latest`.
   This is a **substitution** of the closest CDN match for the sheet's bespoke
   line icons — flag if exact icons are required.
 - **No icon font, no SVG sprite in the source repo** (it's a bash plugin) — so
@@ -149,7 +150,8 @@ real image is the logo mark; everything else is type, terminals, and glow.
 **Root**
 - `styles.css` — global entry point (consumers link this); `@import`s only.
 - `tokens/` — `fonts.css`, `colors.css`, `typography.css`, `spacing.css`, `effects.css`.
-- `assets/` — `logo-mark.png` (cropped lockup), `brand-concept-sheet.png` (reference).
+- `assets/` — `logo-mark.png` (cropped lockup). The reference concept sheet is the
+  repo-root `assets/concept-design.png`.
 - `SKILL.md` — Agent-Skills-compatible entry for downloading this system.
 
 **Components** (`window.DesignSystem_7d9b63.*`)
