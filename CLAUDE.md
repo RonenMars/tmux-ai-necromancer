@@ -81,6 +81,19 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    reconstructs multi-pane windows instead of flattening each pane into its own
    window.
 
+   Each split must target the group's PREVIOUS pane (`group` key `lastpane`),
+   never the window. `split-window -t <window>` splits that window's *active*
+   pane, and `-d` stops the new pane becoming active — so every split hits the
+   same pane and inserts directly after it, reversing records 2..N. Measured on
+   real tmux: three `split-window -d -t <window>` calls yield pane index order
+   1,3,2. Nothing errors, and the geometry replay still looks right, because
+   `select-layout` assigns cells by pane index and **ignores the pane ids baked
+   into the layout string** (verified: feeding a layout whose ids name a
+   different order moves nothing). The damage is silent and semantic — each
+   agent comes back in the wrong pane, which reads as "the layout changed" and
+   "that's not the session I had". Two panes can't show it (one split, nothing
+   to reorder); it needs 3+. Covered by `necro-restore-split-order-test.sh`.
+
 3. **Never `set -e`-abort on a tmux call in restore.** The predecessor died with
    `duplicate session: <name>` the moment a target already existed. Guard tmux
    calls; reuse existing sessions.
@@ -330,6 +343,7 @@ bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and 
 bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
 bash tests/necro-restore-claim-existing-test.sh   # restore claims unmarked resurrect-created panes
 bash tests/necro-restore-multipane-window-test.sh # multi-pane windows restore as splits, not flat windows
+bash tests/necro-restore-split-order-test.sh      # each split targets the previous pane, preserving record order
 bash tests/necro-restore-safety-test.sh           # restore skips oversized transcripts and unsafe cwds
 bash tests/necro-snapshot-idle-shell-test.sh      # idle shells trust only pane-local watcher state
 bash tests/necro-watch-daemon-lock-test.sh        # watcher daemon lock: one daemon per server
