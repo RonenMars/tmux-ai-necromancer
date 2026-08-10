@@ -444,12 +444,19 @@ while IFS= read -r line; do
   elif [ -n "$(group_get "$group" win)" ]; then
     # A window for this (session, window_index) was already created this run —
     # this record was another pane in that window, so split into it.
+    #
+    # Split from the group's PREVIOUS pane, not the window. `split-window -t
+    # <window>` splits that window's active pane, and `-d` stops the new pane
+    # becoming active, so every split would hit the same pane and insert after
+    # it — reversing records 2..N. The layout replay assigns geometry by pane
+    # index, so that reversal lands each agent in the wrong pane.
+    split_from="$(group_get "$group" lastpane "$(group_get "$group" win)")"
     necro_say "  splitting into window for '$safe_name'"
     if [ "$DRY_RUN" = "1" ]; then
-      echo "  DRY: tmux split-window -t $(group_get "$group" win) -c $cwd (mark=$mark)"
+      echo "  DRY: tmux split-window -t $split_from -c $cwd (mark=$mark)"
       pane_target=""
     else
-      pane_target="$(tmux split-window -d -t "$(group_get "$group" win)" -c "$cwd" -P -F '#{pane_id}' 2>/dev/null || true)"
+      pane_target="$(tmux split-window -d -t "$split_from" -c "$cwd" -P -F '#{pane_id}' 2>/dev/null || true)"
       [ -n "$pane_target" ] && tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
     fi
     restored=$((restored + 1))
@@ -483,6 +490,10 @@ while IFS= read -r line; do
     restored=$((restored + 1))
     fresh=1
   fi
+
+  # Remember this record's pane so the group's next split lands after it,
+  # preserving snapshot record order (see the split path above).
+  [ -n "$pane_target" ] && group_set "$group" lastpane "$pane_target"
 
   # Track active-pane / zoom / active-window flags for the post-loop replay.
   # apane only lands for panes resolved this run; the marker-reuse path never
