@@ -135,6 +135,48 @@ by hand once your sessions are back.
 
 ---
 
+## `necro-resume` restores nothing: "skip resume: missing agent or uuid"
+
+**Symptom:** Resume runs clean, reports `Records: 1` and
+`agents resumed: 0`, and the one record it read is
+`{"agent":"","uuid":"","cwd":"$HOME"}`.
+
+**Cause:** With no reboot pointer set, resume falls back to the *most recent*
+autosave — and autosave kept running while the server was collapsing, so the
+newest file describes an already-empty server. The 90-second uptime guard
+above only covers a reboot; a server killed or drained while the machine
+stays up has no such protection, and each 5-minute tick writes another
+emptier snapshot.
+
+**Fix:** Pick the last snapshot that still has your agents and pass it to
+restore positionally. To find it:
+
+```sh
+cd "$(tmux show-option -gv @necromancer_snapshot_dir)"
+for f in $(ls -1t *.jsonl | head -30 | tail -r); do
+  printf '%s  panes=%-3s agents=%s\n' "${f%%.*}" \
+    "$(wc -l < "$f" | tr -d ' ')" \
+    "$(jq -r 'select(.agent != null and .agent != "") | .agent' "$f" | wc -l | tr -d ' ')"
+done
+```
+
+Then dry-run it before running it for real:
+
+```sh
+scripts/necro-restore.sh ~/.claude/tmux-snapshots/<stamp>.idle-only.jsonl --dry-run
+```
+
+Restore is idempotent, so running it for real afterwards reuses whatever
+sessions are already up and only adds the missing ones.
+
+**Prevention:** Run `necro-reboot-prep.sh` before any planned teardown — it
+pins a reboot pointer, and resume prefers that pointer over
+newest-file-wins. `@necromancer_max_snapshots` is what buys you the recovery
+window; at the default 288 files × 5 min that is a day of history, so lower
+it only if you are willing to lose that.
+
+---
+
 ## Restore adds 0 windows on second run (idempotency)
 
 This is expected. Restore is keyed on a stable per-pane marker
