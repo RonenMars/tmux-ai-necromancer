@@ -196,6 +196,9 @@ done
 # with no pin falls back to a filesystem guess at snapshot time, which is
 # exactly the path that used to hand out stale transcripts.
 section "Live agent panes"
+# Hoisted: the snapshot section below compares against it, and `set -u` would
+# abort there if no server had ever set it.
+agent_total=0
 if [ "$HAVE_SERVER" = "1" ]; then
   pane_total=0; agent_total=0; pinned_total=0; unpinned_list=""
   while IFS=$'\t' read -r pane_id pane_cmd; do
@@ -262,6 +265,20 @@ else
     warn "$((with_agent - with_uuid)) agent record(s) carry no UUID and cannot be resumed"
   else
     ok "every agent record carries a UUID"
+  fi
+
+  # Every check above asks whether the records are well-formed, never whether
+  # they cover the server. A snapshot written while the server was collapsing —
+  # or mid-restore, before the panes exist — is perfectly well-formed and
+  # resurrects only the fraction it saw. That is what makes it dangerous:
+  # `necro-reboot-resume.sh` with no pinned pointer takes the NEWEST file, so an
+  # unrepresentative newest snapshot silently restores less than you had.
+  # Only under-coverage matters; more records than live panes just means agents
+  # exited since, which costs restore nothing.
+  if [ "$HAVE_SERVER" = "1" ] && [ "$with_agent" -lt "$agent_total" ]; then
+    warn "snapshot names $with_agent agent(s) but $agent_total are running — it does not represent the server"
+    note "a restore from this file would resurrect $with_agent of $agent_total; do not run a bare necro-resume until the next autosave"
+    note "expected briefly after an agent starts or during a restore; it heals on the next tick"
   fi
 fi
 

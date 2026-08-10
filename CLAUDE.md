@@ -333,6 +333,7 @@ bash tests/necro-restore-bash32-test.sh           # restore runs clean under sto
 bash tests/necro-agent-codex-matches-test.sh      # @necromancer_codex_commands globs; default still matches the truncated native binary
 bash tests/necro-agent-claude-matches-test.sh     # @necromancer_claude_commands globs; a plain name stays an exact match
 bash tests/necro-doctor-test.sh                   # doctor counts snapshot records, is read-only, exits 1 only on real problems
+bash tests/necro-doctor-coverage-test.sh          # doctor warns when the newest snapshot doesn't cover the live server
 bash tests/necro-autosave-stale-lock-test.sh      # the autosave work lock self-heals; a live owner is still respected
 bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
