@@ -22,20 +22,31 @@ necro_init_log "$0"
 necro_load_agents
 
 # --- Flags ------------------------------------------------------------------
-# --idle-only   : never send exit keys to a live agent; capture via fallback only.
-#                 (Used by autosave — zero pane disruption.) DEFAULT.
-# --interactive : prompt per live agent before sending exit keys. Requires a tty.
-# --yes/-y      : auto-answer 'y' to every per-agent exit prompt. Requires a tty.
+# --idle-only     : never send exit keys to a live agent; capture via fallback only.
+#                   (Used by autosave — zero pane disruption.) DEFAULT.
+# --interactive   : prompt per live agent before sending exit keys. Requires a tty.
+# --yes/-y        : auto-answer 'y' to every per-agent exit prompt. Requires a tty.
+# --rate-limited  : idle-only capture of panes whose scrollback shows a
+#                   session/usage-limit banner (Claude/Codex). Writes
+#                   *.rate-limited.jsonl and stamps @necro_limit_saved on saves.
+# --auto          : with --rate-limited only; skip panes already stamped
+#                   @necro_limit_saved=1, clear the stamp when the banner is gone,
+#                   and write no file when nothing new is found. Used by the
+#                   watcher so a stuck limit doesn't re-snapshot every tick.
 IDLE_ONLY=1
 INTERACTIVE=0
 ASSUME_YES=0
+RATE_LIMITED=0
+AUTO_LIMIT=0
 SAW_IDLE=0
 SAW_MODE_FLAG=0
 for arg in "$@"; do
   case "$arg" in
-    --idle-only)   IDLE_ONLY=1; SAW_IDLE=1; SAW_MODE_FLAG=1 ;;
-    --interactive) INTERACTIVE=1; IDLE_ONLY=0; SAW_MODE_FLAG=1 ;;
-    --yes|-y)      ASSUME_YES=1; IDLE_ONLY=0; SAW_MODE_FLAG=1 ;;
+    --idle-only)     IDLE_ONLY=1; SAW_IDLE=1; SAW_MODE_FLAG=1 ;;
+    --interactive)   INTERACTIVE=1; IDLE_ONLY=0; SAW_MODE_FLAG=1 ;;
+    --yes|-y)        ASSUME_YES=1; IDLE_ONLY=0; SAW_MODE_FLAG=1 ;;
+    --rate-limited)  RATE_LIMITED=1; IDLE_ONLY=1; SAW_MODE_FLAG=1 ;;
+    --auto)          AUTO_LIMIT=1 ;;
     --help|-h)
       cat <<'H'
 necro-snapshot.sh — capture tmux AI-agent sessions to a JSONL snapshot.
@@ -45,11 +56,16 @@ Usage:
   necro-snapshot.sh --idle-only     same as bare invocation, explicit
   necro-snapshot.sh --interactive   prompt per live agent before exiting it (needs a real tty)
   necro-snapshot.sh --yes           auto-exit every live agent and capture (needs a real tty)
+  necro-snapshot.sh --rate-limited  idle-only capture of panes showing a rate/session limit
+  necro-snapshot.sh --rate-limited --auto
+                                    same, but skip panes already saved for this limit event
+                                    (watcher auto-save); write nothing if none are new
 
 Exit-capture (--interactive / --yes) requires a real controlling terminal.
 Without one, it is refused and downgraded to --idle-only automatically.
 
-Output: <snapshot-dir>/<timestamp>.jsonl (or .idle-only.jsonl)
+Output: <snapshot-dir>/<timestamp>.jsonl
+        (or .idle-only.jsonl / .rate-limited.jsonl)
 H
       exit 0 ;;
     *) necro_err "Unknown flag: $arg"; exit 2 ;;
@@ -60,8 +76,13 @@ modes_set=0
 (( SAW_IDLE )) && modes_set=$((modes_set + 1))
 (( INTERACTIVE )) && modes_set=$((modes_set + 1))
 (( ASSUME_YES )) && modes_set=$((modes_set + 1))
+(( RATE_LIMITED )) && modes_set=$((modes_set + 1))
 if (( modes_set > 1 )); then
-  necro_err "--idle-only, --interactive and --yes are mutually exclusive."
+  necro_err "--idle-only, --interactive, --yes and --rate-limited are mutually exclusive."
+  exit 2
+fi
+if [ "$AUTO_LIMIT" = "1" ] && [ "$RATE_LIMITED" != "1" ]; then
+  necro_err "--auto requires --rate-limited."
   exit 2
 fi
 
@@ -78,9 +99,15 @@ fi
 SNAP_DIR="$(necro_snapshot_dir)"
 mkdir -p "$SNAP_DIR"
 TS="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
-suffix=""; [ "$IDLE_ONLY" = "1" ] && suffix=".idle-only"
+suffix=""
+if [ "$RATE_LIMITED" = "1" ]; then
+  suffix=".rate-limited"
+elif [ "$IDLE_ONLY" = "1" ]; then
+  suffix=".idle-only"
+fi
 OUT="$SNAP_DIR/${TS}${suffix}.jsonl"
-necro_log_event "snapshot" "start" "idle_only=$IDLE_ONLY" "assume_yes=$ASSUME_YES" "output=$OUT"
+necro_log_event "snapshot" "start" "idle_only=$IDLE_ONLY" "assume_yes=$ASSUME_YES" "rate_limited=$RATE_LIMITED" "auto_limit=$AUTO_LIMIT" "output=$OUT"
+RATE_LIMITED_SAVED=0
 
 # --- Record emitter ---------------------------------------------------------
 # uuid_source: "scrollback" | "latest-jsonl" | "" (none)
@@ -148,6 +175,7 @@ export NECRO_CURSOR_DIR
 
 echo "Snapshot will be written to: $OUT"
 (( SAW_MODE_FLAG == 0 )) && echo "No mode flag given — defaulting to --idle-only. Pass --interactive to prompt per pane for exit-capture."
+[ "$RATE_LIMITED" = "1" ] && echo "Mode: --rate-limited — only panes showing a session/usage-limit banner."
 echo
 
 snapshot=$(tmux list-panes -a -F \
@@ -162,6 +190,46 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
     "$i" "$total" "$pane_id" "$session" "$win_idx" "$win_name" "$cmd"
 
   agent="$(necro_agent_for_cmd "$cmd")"
+
+  # --rate-limited: only live agent panes whose scrollback shows a limit
+  # banner. Idle shells / non-agents are skipped (a limited Claude/Codex is
+  # still the foreground command — the banner sits above an empty prompt).
+  if [ "$RATE_LIMITED" = "1" ]; then
+    if [ -z "$agent" ]; then
+      echo "  skip — not a live AI agent"
+      continue
+    fi
+    already="$(tmux show-option -pqv -t "$pane_id" @necro_limit_saved 2>/dev/null || true)"
+    if necro_agent_hit_limit "$agent" "$pane_id"; then
+      if [ "$AUTO_LIMIT" = "1" ] && [ "$already" = "1" ]; then
+        echo "  rate-limited ($agent) — already saved this limit event, skip"
+        continue
+      fi
+      fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
+      fb_source="pane-option"
+      if [ -z "$fb" ]; then
+        fb="$(resolve_fallback_id "$agent" "$cwd")"
+        fb_source="latest-jsonl"
+      fi
+      if [ -n "$fb" ]; then
+        echo "  rate-limited ($agent) — ${fb_source}: $fb"
+        emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "$fb_source" "$layout" "$zoomed" "$pactive" "$wactive"
+      else
+        echo "  rate-limited ($agent) — no session id, recording without id"
+        emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" "" "$layout" "$zoomed" "$pactive" "$wactive"
+      fi
+      tmux set-option -p -t "$pane_id" @necro_limit_saved "1" 2>/dev/null || true
+      RATE_LIMITED_SAVED=1
+    else
+      if [ "$AUTO_LIMIT" = "1" ] && [ "$already" = "1" ]; then
+        tmux set-option -pu -t "$pane_id" @necro_limit_saved 2>/dev/null || true
+        echo "  limit banner gone ($agent) — cleared @necro_limit_saved"
+      else
+        echo "  skip — $agent not showing a limit banner"
+      fi
+    fi
+    continue
+  fi
 
   # Idle shell — only trust pane-local watcher state. A cwd-only latest-jsonl
   # lookup can attach the same stale UUID to every shell in that directory.
@@ -251,6 +319,12 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
 done <<<"$snapshot"
 
 echo
+if [ "$RATE_LIMITED" = "1" ] && [ "$RATE_LIMITED_SAVED" != "1" ]; then
+  rm -f "$OUT"
+  echo "No rate-limited panes to save."
+  necro_log_event "snapshot" "complete" "output=" "rate_limited=1" "saved=0"
+  exit 0
+fi
 echo "Snapshot written: $OUT"
 echo "Records: $(wc -l < "$OUT" | tr -d ' ')"
 necro_log_event "snapshot" "complete" "output=$OUT"

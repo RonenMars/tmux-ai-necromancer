@@ -16,6 +16,7 @@ set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
 set -g @necromancer_autosave_tick   '60'            # autosave daemon polling interval in seconds
 set -g @necromancer_watch_tick      '1'             # watcher daemon polling interval in seconds
+set -g @necromancer_limit_check_interval '60'       # seconds between rate-limit auto-saves (0 disables; or NECROMANCER_LIMIT_CHECK_INTERVAL)
 set -g @necromancer_claude_commands  'claude'        # space-separated command names for Claude Code (add aliases, e.g. 'claude cc')
 set -g @necromancer_codex_commands   'codex codex-*' # same, for Codex; entries are globs (the default covers the truncated native binary)
 set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
@@ -66,6 +67,13 @@ ended by asking *you* a question, an auto-sent `continue` answers it blindly —
 disable the message when that matters. Also configurable via `--resume-message` /
 `--resume-message-delay` and `NECROMANCER_RESUME_MESSAGE` /
 `NECROMANCER_RESUME_MESSAGE_DELAY`.
+
+Rate-limit auto-save: the watcher scans for Claude "session limit" / Codex
+"usage limit" banners at most once per `@necromancer_limit_check_interval`
+seconds (default 60; set to `0` or `NECROMANCER_LIMIT_CHECK_INTERVAL=0` to
+disable). Matching panes are written to a `*.rate-limited.jsonl` snapshot and
+stamped `@necro_limit_saved` so the same event is not re-saved every minute.
+Manual: `necro-snapshot.sh --rate-limited` or menu `[6]`.
 
 Snapshots also record each pane's `window_layout`, and restore replays it with
 `select-layout` so a multi-pane window comes back with its original arrangement

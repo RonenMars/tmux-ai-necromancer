@@ -63,9 +63,10 @@ snapshot_summary() {
   name="$(basename "$f" .jsonl)"
   # detect kind from suffix
   case "$name" in
-    *.idle-only) kind="autosave"; ts="${name%.idle-only}" ;;
-    *.enriched)  kind="reboot  "; ts="${name%.enriched}" ;;
-    *)           kind="snapshot"; ts="$name" ;;
+    *.idle-only)    kind="autosave "; ts="${name%.idle-only}" ;;
+    *.rate-limited) kind="rate-lim "; ts="${name%.rate-limited}" ;;
+    *.enriched)     kind="reboot  "; ts="${name%.enriched}" ;;
+    *)              kind="snapshot"; ts="$name" ;;
   esac
   ts="$(printf '%s' "$ts" | sed 's/T/ /' | sed 's/-/:/4' | sed 's/-/:/4')"
   records="$(wc -l < "$f" | tr -d ' ')"
@@ -311,6 +312,17 @@ action_reboot_prep() {
   esac
 }
 
+action_save_rate_limited() {
+  necro_log_event "menu" "save_rate_limited" "snapshot_dir=$SNAP_DIR"
+  necro_hr
+  necro_say "Save rate-limited sessions"
+  echo ""
+  echo "  Captures only panes whose scrollback shows a Claude session-limit"
+  echo "  or Codex usage-limit banner. Idle-only — no exit keys sent."
+  echo ""
+  "$SELF_DIR/necro-snapshot.sh" --rate-limited || true
+}
+
 # ── main loop ─────────────────────────────────────────────────────────────────
 
 while true; do
@@ -325,6 +337,7 @@ while true; do
   echo "  [3] Cleanup backups"
   echo "  [4] Reboot / shutdown prep"
   echo "  [5] Diagnose (health check)"
+  echo "  [6] Save rate-limited sessions"
   echo "  [0] Exit"
   necro_hr
   printf 'Choice: '
@@ -336,6 +349,7 @@ while true; do
     3) action_cleanup_backups ;;
     4) action_reboot_prep ;;
     5) "$SELF_DIR/necro-doctor.sh" || true ;;
+    6) action_save_rate_limited ;;
     0|"") echo ""; break ;;
     *) necro_warn "Invalid choice." ;;
   esac

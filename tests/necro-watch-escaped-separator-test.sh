@@ -19,6 +19,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 export HOME="$TMP/home"
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
+export NECROMANCER_LIMIT_CHECK_INTERVAL=0  # disable auto limit-save; this test asserts watcher behaviour
 TMPBIN="$TMP/bin"
 CWD="$TMP/work"
 UUID="aaaaaaaa-0000-0000-0000-000000000001"
