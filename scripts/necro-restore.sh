@@ -286,20 +286,20 @@ NECRO_MARK="@necro_id"
 # Does a pane already carry this marker in this session?
 window_marked() {
   local session="$1" mark="$2"
-  tmux list-panes -s -t "=$session" -F "#{$NECRO_MARK}" 2>/dev/null \
+  tmux list-panes -s -t "=$session:" -F "#{$NECRO_MARK}" 2>/dev/null \
     | grep -qxF "$mark"
 }
 
 # Pane id (%N) of the pane carrying this marker ("" if none).
 window_id_for_mark() {
   local session="$1" mark="$2"
-  tmux list-panes -s -t "=$session" -F "#{$NECRO_MARK}	#{pane_id}" 2>/dev/null \
+  tmux list-panes -s -t "=$session:" -F "#{$NECRO_MARK}	#{pane_id}" 2>/dev/null \
     | awk -F'\t' -v m="$mark" '$1==m {print $2; exit}'
 }
 
 unmarked_window_id_for_record() {
   local session="$1" win_idx="$2" win_name="$3" safe_name="$4" cwd="$5"
-  tmux list-panes -s -t "=$session" \
+  tmux list-panes -s -t "=$session:" \
       -F "#{window_index}	#{window_name}	#{pane_id}	#{pane_current_path}	#{$NECRO_MARK}" 2>/dev/null \
     | awk -F'\t' -v idx="$win_idx" -v name="$win_name" -v safe="$safe_name" -v cwd="$cwd" \
         '$5 == "" && $4 == cwd && ($1 == idx || $2 == name || $2 == safe) { print $3; exit }'
@@ -466,7 +466,7 @@ while IFS= read -r line; do
     if [ "$DRY_RUN" = "1" ]; then
       pane_target=""; group_set "$group" win "=$session:dry"
     else
-      pane_target="$(tmux list-panes -t "=$session" -F '#{pane_id}' 2>/dev/null | head -1)"
+      pane_target="$(tmux list-panes -t "=$session:" -F '#{pane_id}' 2>/dev/null | head -1)"
       tmux set-option -p -t "$pane_target" "$NECRO_MARK" "$mark" 2>/dev/null || true
       group_set "$group" win "$(tmux list-windows -t "=$session" -F '#{window_id}' 2>/dev/null | head -1)"
     fi
@@ -475,10 +475,10 @@ while IFS= read -r line; do
   else
     necro_say "  adding window '$safe_name'"
     if [ "$DRY_RUN" = "1" ]; then
-      echo "  DRY: tmux new-window -t =$session -c $cwd -n $safe_name (mark=$mark)"
+      echo "  DRY: tmux new-window -t =$session: -c $cwd -n $safe_name (mark=$mark)"
       pane_target=""; group_set "$group" win "=$session:dry"
     else
-      window_id="$(tmux new-window -d -t "=$session" -c "$cwd" -n "$safe_name" -P -F '#{window_id}' 2>/dev/null || true)"
+      window_id="$(tmux new-window -d -t "=$session:" -c "$cwd" -n "$safe_name" -P -F '#{window_id}' 2>/dev/null || true)"
       if [ -n "$window_id" ]; then
         group_set "$group" win "$window_id"
         pane_target="$(tmux list-panes -t "$window_id" -F '#{pane_id}' 2>/dev/null | head -1)"

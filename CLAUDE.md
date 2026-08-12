@@ -81,6 +81,11 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    reconstructs multi-pane windows instead of flattening each pane into its own
    window.
 
+   Every target-window lookup or creation for a snapshot session must target
+   `=$session:`. Without the trailing colon, a numeric session such as `2` can
+   resolve to window index 2 in the current session, so the restore marks or
+   creates panes in the wrong session and a partial rerun double-resumes them.
+
    Each split must target the group's PREVIOUS pane (`group` key `lastpane`),
    never the window. `split-window -t <window>` splits that window's *active*
    pane, and `-d` stops the new pane becoming active — so every split hits the
@@ -309,6 +314,8 @@ bash tests/necro-agent-codex-min-epoch-test.sh    # codex honors the stale-trans
 bash tests/necro-agent-codex-scrape-ps-resume-test.sh  # codex argv ground truth (subcommand form)
 bash tests/necro-menu-cleanup-pin-test.sh # menu cleanup never deletes the pinned reboot snapshot
 bash tests/necro-restore-claim-group-test.sh # claimed windows group later records (no flattening)
+bash tests/necro-restore-numeric-session-create-test.sh # numeric session creation targets the intended session
+bash tests/necro-restore-numeric-session-target-test.sh # numeric session reruns resolve markers in the correct session
 bash tests/necro-agent-scrape-ps-resume-test.sh   # ps-argv is ground truth for pane UUID pinning
 bash tests/necro-agent-scrape-ps-resume-multichild-test.sh  # finds claude among sibling processes
 bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts
