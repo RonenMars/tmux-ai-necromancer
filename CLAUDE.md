@@ -376,6 +376,7 @@ bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the p
 bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots
 bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events
 bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
+bash tests/necro-reboot-prep-skips-rate-limited-test.sh # the reboot target is never a rate-limited capture
 bash tests/necro-restore-claim-existing-test.sh   # restore claims unmarked resurrect-created panes
 bash tests/necro-restore-multipane-window-test.sh # multi-pane windows restore as splits, not flat windows
 bash tests/necro-restore-split-order-test.sh      # each split targets the previous pane, preserving record order
