@@ -374,6 +374,7 @@ bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one da
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
 bash tests/necro-restore-keybind-test.sh          # restore binds prefix+ai via a key-table; single-key override still works
 bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot
+bash tests/necro-autosave-rotation-rate-limited-test.sh # rate-limited captures rotate too; the pin still exempts them
 bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots
 bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events
 bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
