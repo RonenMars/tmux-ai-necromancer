@@ -171,6 +171,22 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    `@necro_pane_first_seen` stamp via the optional `min_epoch` filter. Never
    drop back to a scrollback/cursor-pop-only resolution order.
 
+   It must also (c) skip ids already pinned to a live pane
+   (`necro_live_pinned_uuids`). The cursor's own dedup does not cover this: it
+   only records ids IT handed out, so an id resolved from argv or scrollback is
+   invisible to it, and `min_epoch` can't reject that id either — the pane
+   running it is writing that transcript right now, which makes it the
+   FRESHEST candidate in the cwd rather than a stale one. The result was a
+   brand-new pane in a cwd that already had an agent being handed that agent's
+   session: observed 3x in 24h on a real server (panes %13/%27, %31/%32,
+   %36/%41), each time in the new pane's first snapshot, once persisting 25
+   minutes across 5 snapshots. Restoring such a snapshot resumes one
+   conversation into two panes and silently loses the second pane's real
+   session. The two filters are complementary — the cursor covers two fresh
+   panes in the same tick, the live-pin set covers everything pinned before it
+   — so neither is redundant. Covered by
+   `necro-agent-pop-live-pin-test.sh`.
+
 10. **Resume launches during restore/apply must be paced, not fired all at
     once.** `necro-restore.sh` and `necro-apply.sh` send a `claude`/`codex
     --resume` into every matching pane; doing this back-to-back for several
@@ -313,6 +329,7 @@ bash tests/necro-context-codex-test.sh   # context enrichment for Codex sessions
 bash tests/necro-prune-idle-window-test.sh  # prune kills idle windows, keeps busy ones
 bash tests/necro-agent-claude-project-dir-test.sh # Claude's cwd encoding ('/', '.', '_' -> '-')
 bash tests/necro-agent-pop-cursor-test.sh # cursor pop tracks WHICH ids were used, not how many
+bash tests/necro-agent-pop-live-pin-test.sh # cursor pop never hands out an id a live pane already holds
 bash tests/necro-agent-codex-min-epoch-test.sh    # codex honors the stale-transcript filter too
 bash tests/necro-agent-codex-scrape-ps-resume-test.sh  # codex argv ground truth (subcommand form)
 bash tests/necro-menu-cleanup-pin-test.sh # menu cleanup never deletes the pinned reboot snapshot
