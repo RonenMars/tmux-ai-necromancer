@@ -140,11 +140,17 @@ fi
     echo "[$(necro_ts)] closed: pane=$pane_id agent=${cmd:-unknown} uuid=${uuid:-none} cwd=$cwd"
   done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_path}' 2>/dev/null)
 
-  # Rotate: keep only the N most-recent autosave files, but never the snapshot
+  # Rotate: keep only the N most-recent snapshot files, but never the snapshot
   # pinned as the reboot target — a delayed reboot-resume must still find it.
   # POSIX loop (runs under /bin/sh via tmux — no `mapfile`).
+  #
+  # The glob is an allowlist, so anything not named here is immortal AND free of
+  # the max_snapshots budget. rate-limited captures are listed because the
+  # watcher writes them unattended on a timer; without them the cap really meant
+  # "N autosaves, plus however many of everything else".
   pinned="$(readlink "$SNAP_DIR/latest-for-reboot" 2>/dev/null || true)"
-  /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl "$SNAP_DIR"/*.enriched.jsonl 2>/dev/null \
+  /bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl "$SNAP_DIR"/*.enriched.jsonl \
+             "$SNAP_DIR"/*.rate-limited.jsonl 2>/dev/null \
     | tail -n "+$(( max_snapshots + 1 ))" \
     | while IFS= read -r f; do
         if [ "$f" = "$pinned" ]; then

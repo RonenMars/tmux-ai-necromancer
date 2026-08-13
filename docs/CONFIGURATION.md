@@ -8,7 +8,7 @@ loads TPM:
 
 ```tmux
 set -g @necromancer_interval         '5'             # minutes between autosaves
-set -g @necromancer_max_snapshots    '288'           # autosave files to keep (~24h at 5m interval)
+set -g @necromancer_max_snapshots    '288'           # snapshot files to keep (~24h at 5m interval)
 set -g @necromancer_agents           'claude codex'  # which agents to track
 set -g @necromancer_restore_key      'ai'            # prefix chord for restore popup (two letters → prefix+a then i; a single key name still works)
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
@@ -74,6 +74,12 @@ seconds (default 60; set to `0` or `NECROMANCER_LIMIT_CHECK_INTERVAL=0` to
 disable). Matching panes are written to a `*.rate-limited.jsonl` snapshot and
 stamped `@necro_limit_saved` so the same event is not re-saved every minute.
 Manual: `necro-snapshot.sh --rate-limited` or menu `[6]`.
+
+These captures rotate like any other snapshot: they count toward
+`@necromancer_max_snapshots` and age out with the rest, so a save from menu
+`[6]` is not kept forever — at the default 288 / 5 min that is roughly 24 hours.
+Pin one as the reboot target to exempt it, or copy it out of the snapshot dir if
+you need it longer.
 
 Snapshots also record each pane's `window_layout`, and restore replays it with
 `select-layout` so a multi-pane window comes back with its original arrangement
