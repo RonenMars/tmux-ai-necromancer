@@ -159,3 +159,11 @@ necro_agent_exit_keys() {
   declare -f "agent_${agent}_exit_keys" >/dev/null 2>&1 || return 0
   "agent_${agent}_exit_keys" "$@"
 }
+
+# Exit 0 if the pane's scrollback shows this agent's rate/session-limit banner.
+# Adapters without agent_<name>_hit_limit return 1 (not limited).
+necro_agent_hit_limit() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_hit_limit" >/dev/null 2>&1 || return 1
+  "agent_${agent}_hit_limit" "$@"
+}

@@ -12,6 +12,7 @@ trap 'rm -rf "$TMP"' EXIT
 
 export HOME="$TMP/home"
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
+export NECROMANCER_LIMIT_CHECK_INTERVAL=0  # disable auto limit-save; this test asserts watcher behaviour
 mkdir -p "$HOME" "$NECROMANCER_SNAPSHOT_DIR"
 
 TMPBIN="$TMP/bin"

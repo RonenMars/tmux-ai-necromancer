@@ -22,6 +22,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snap"
+export NECROMANCER_LIMIT_CHECK_INTERVAL=0  # disable auto limit-save; this test asserts watcher behaviour
 export NECROMANCER_LOG_DIR="$TMP/logs"
 mkdir -p "$NECROMANCER_SNAPSHOT_DIR" "$NECROMANCER_LOG_DIR"
 
@@ -41,13 +42,18 @@ case "$1" in
   show-option)
     case "$*" in
       *@necromancer_last_watch*) echo 0 ;;
+      *@necromancer_last_limit_check*) echo 9999999999 ;;
+      *@necromancer_limit_check_interval*) echo 60 ;;
       *@necromancer_agents*)     echo "claude" ;;
       *) echo "" ;;
     esac
     exit 0 ;;
   show-options)
     # -g global dump: the only options the walk needs.
-    printf '@necromancer_last_watch 0\n@necromancer_agents claude\n'
+    # last_limit_check is far in the future so the rate-limit auto-save path
+    # does not fire (it would background a snapshot and add non-tick tmux
+    # calls — this test measures the steady-state walk only).
+    printf '@necromancer_last_watch 0\n@necromancer_last_limit_check 9999999999\n@necromancer_limit_check_interval 60\n@necromancer_agents claude\n'
     exit 0 ;;
   list-panes)
     i=1

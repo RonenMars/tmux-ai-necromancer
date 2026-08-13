@@ -14,6 +14,7 @@
 #   @necromancer_debug           write per-command debug logs        (default off)
 #   @necromancer_autosave_tick   daemon polling interval in seconds   (default 60)
 #   @necromancer_watch_tick      watcher polling interval in seconds  (default 1)
+#   @necromancer_limit_check_interval  seconds between rate-limit auto-saves (default 60; 0 off)
 #   @necromancer_resume_delay      seconds to pause between resume batches (default 5)
 #   @necromancer_resume_batch_size resumes launched per batch before pausing (default 1)
 #   @necromancer_claude_commands   command names that mean Claude Code    (default "claude")
@@ -47,6 +48,7 @@ set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_debug"           "off"
 set_default "@necromancer_autosave_tick"   "60"
 set_default "@necromancer_watch_tick"      "1"
+set_default "@necromancer_limit_check_interval" "60"
 set_default "@necromancer_resume_delay"       "5"
 set_default "@necromancer_resume_batch_size"  "1"
 necro_log_event "plugin" "configure_defaults" "debug=$(necro_tmux_option @necromancer_debug off)"

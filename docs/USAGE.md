@@ -5,6 +5,7 @@
 | Restore latest snapshot | `prefix + a i` (popup), or `necro-restore.sh` |
 | Manual snapshot (no disruption, default) | `necro-snapshot.sh` |
 | Manual snapshot (interactive exit-capture) | `necro-snapshot.sh --interactive` |
+| Save rate-limited Claude/Codex panes | `necro-snapshot.sh --rate-limited` (also menu `[6]`; watcher auto-saves every `@necromancer_limit_check_interval` s) |
 | Restore a specific snapshot | `necro-restore.sh <file.jsonl>` |
 | Dry-run a restore | `necro-restore.sh --dry-run` |
 | Before reboot | `necro-reboot-prep.sh` (or `safe-reboot` / `safe-shutdown` aliases) |

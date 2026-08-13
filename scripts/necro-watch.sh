@@ -16,6 +16,10 @@
 #                            pane (a stale/unrelated transcript can't belong
 #                            to a pane that didn't exist yet when it was
 #                            written).
+#   @necro_limit_saved     — "1" after a rate-limited snapshot recorded this
+#                            pane for the current limit event. Cleared on
+#                            agent restart (and by --rate-limited --auto when
+#                            the limit banner disappears).
 set -uo pipefail
 
 _src="${BASH_SOURCE[0]}"
@@ -127,10 +131,12 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
     tmux set-option -pu -t "$pane_id" @necro_agent           2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_agent_exited    2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_pane_first_seen 2>/dev/null || true
+    tmux set-option -pu -t "$pane_id" @necro_limit_saved     2>/dev/null || true
     # first_seen is cleared too: it was read before the unset above, and Case 2
     # re-stamps it. Leaving the pre-unset value here would keep the OLD stamp,
     # and the min_epoch filter would then reject the relaunched agent's own
-    # (newer) transcript.
+    # (newer) transcript. limit_saved clears so a later quota hit can be
+    # auto-saved again for the new launch.
     pinned_uuid=""; pinned_cmd=""; pinned_agent=""; exited=""; first_seen=""
     # Falls through to Case 2 (pin fresh UUID).
   fi
@@ -193,5 +199,46 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
   fi
 
 done < <(tmux list-panes -a -F "#{pane_id}${NECRO_FS}#{pane_current_command}${NECRO_FS}#{@necro_uuid}${NECRO_FS}#{@necro_cmd}${NECRO_FS}#{@necro_agent}${NECRO_FS}#{@necro_agent_exited}${NECRO_FS}#{@necro_pane_first_seen}${NECRO_FS}#{pane_current_path}" 2>/dev/null | _necro_unescape_fs)
+
+# Throttled rate-limit auto-save. capture-pane is O(agent panes), so this must
+# NOT run every watch tick (invariant 15). Default interval is 60s. The snapshot
+# runs in a backgrounded subshell behind its own mkdir lock so the watch lock
+# is released immediately and concurrent ticks cannot stack captures.
+#
+# NECROMANCER_LIMIT_CHECK_INTERVAL overrides the tmux option (0 disables).
+# Watcher unit tests that assert tick cost / lock behaviour export 0 so a
+# background snapshot cannot pollute their call counts.
+if [ -n "${NECROMANCER_LIMIT_CHECK_INTERVAL+x}" ]; then
+  LIMIT_INTERVAL="$NECROMANCER_LIMIT_CHECK_INTERVAL"
+else
+  LIMIT_INTERVAL="$(necro_tmux_option @necromancer_limit_check_interval 60)"
+fi
+case "$LIMIT_INTERVAL" in
+  ''|*[!0-9]*) LIMIT_INTERVAL=60 ;;
+esac
+LAST_LIMIT_OPT="@necromancer_last_limit_check"
+if [ "$LIMIT_INTERVAL" -gt 0 ]; then
+  last_limit="$(necro_tmux_option "$LAST_LIMIT_OPT" 0)"
+  case "$last_limit" in
+    ''|*[!0-9]*) last_limit=0 ;;
+  esac
+  if [ "$(( now - last_limit ))" -ge "$LIMIT_INTERVAL" ]; then
+    tmux set-option -gq "$LAST_LIMIT_OPT" "$now"
+    necro_log_event "watch" "limit_check_due" "interval=$LIMIT_INTERVAL"
+    _necro_limit_save_work() {
+      LIMIT_LOCK="$(necro_snapshot_dir)/.limit-save.lock"
+      mkdir "$LIMIT_LOCK" 2>/dev/null || return 0
+      trap 'rmdir "$LIMIT_LOCK" 2>/dev/null' EXIT
+      "$SELF_DIR/necro-snapshot.sh" --rate-limited --auto >/dev/null 2>&1 || true
+    }
+    # Always run in a subshell so the limit-lock EXIT trap cannot overwrite the
+    # watch lock's trap. Sync mode (tests) waits; production backgrounds.
+    if [ "${NECROMANCER_LIMIT_SAVE_SYNC:-0}" = "1" ]; then
+      ( _necro_limit_save_work )
+    else
+      ( _necro_limit_save_work ) &
+    fi
+  fi
+fi
 
 exit 0

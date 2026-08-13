@@ -6,7 +6,7 @@ single file in `lib/agents/<name>.sh` plus adding `<name>` to
 
 ## The contract
 
-Implement these seven functions, prefixed `agent_<name>_`:
+Implement these functions, prefixed `agent_<name>_` (optional ones may be omitted):
 
 ```bash
 # Is this pane's foreground command your agent?
@@ -32,6 +32,13 @@ agent_<name>_scrape_resume_cmd() { ... }
 # the watcher tries it first. Return "" if N/A (e.g. a fresh, non-resumed
 # session has no id here yet — that's not a failure).
 agent_<name>_scrape_ps_resume() { ... }
+
+# Optional: return 0 if this pane's recent scrollback shows a rate/session
+# limit banner (Claude: "hit your session limit"; Codex: "hit your usage
+# limit"). Used by necro-snapshot.sh --rate-limited and the watcher's
+# throttled auto-save. Omit (or always return 1) if the agent has no such
+# banner.
+agent_<name>_hit_limit() { ... }
 
 # The shell command that resumes a session id.
 agent_<name>_resume_cmd() { printf '<binary> resume %s' "$1"; }

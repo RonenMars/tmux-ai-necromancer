@@ -13,10 +13,10 @@ or reboot. Pure bash + a small Go TUI. No build step for the plugin itself.
 ```
 tmux-ai-necromancer.tmux   TPM entrypoint — starts autosave + watcher daemons, binds restore key
 scripts/                   the executables (all source lib/*.sh)
-  necro-snapshot.sh        walk panes → JSONL snapshot (per-agent id capture)
+  necro-snapshot.sh        walk panes → JSONL snapshot (per-agent id capture; --rate-limited for quota hits)
   necro-autosave.sh        one-shot throttled background snapshot + rotation
   necro-autosave-daemon.sh autosave scheduler, independent of status-right
-  necro-watch.sh           one-tick pane watcher — pins @necro_uuid/@necro_agent to panes
+  necro-watch.sh           one-tick pane watcher — pins @necro_uuid/@necro_agent; throttled rate-limit auto-save
   necro-watch-daemon.sh    watcher scheduler, independent of status-right
   necro-restore.sh         rebuild sessions/windows from a snapshot (IDEMPOTENT)
   necro-apply.sh           reorganize LIVE panes into dest sessions + resume
@@ -25,7 +25,7 @@ scripts/                   the executables (all source lib/*.sh)
   necro-reboot-resume.sh   post-reboot: ensure server up → necro-restore.sh
   necro-prune.sh           kill windows whose panes are all idle shells (no child procs)
   necro-doctor.sh          read-only health check (daemons, locks, pins, snapshot)
-  necro-menu.sh            interactive menu: list/resume/cleanup snapshots, reboot prep
+  necro-menu.sh            interactive menu: list/resume/cleanup snapshots, reboot prep, rate-limited save
   necro-log-divider.sh     stamp a labelled separator into every debug log
   necro-clean-debug-logs.sh   remove debug logs (needs tmux)
   necro-clean-debug-logs.py   same, standalone — no tmux/shell needed (Windows/Linux)
@@ -52,6 +52,8 @@ defining these functions (all prefixed `agent_<name>_`):
 | `agent_<name>_latest_session_id "$cwd"` | most-recent resumable id for a cwd (filesystem fallback), or "" |
 | `agent_<name>_scrape_session_id "$pane"` | id scraped from pane scrollback, or "" |
 | `agent_<name>_scrape_resume_cmd "$pane"` | `--resume <uuid>` scraped from startup scrollback, or "" |
+| `agent_<name>_scrape_ps_resume "$pane"` | id from running process argv (ground truth), or "" |
+| `agent_<name>_hit_limit "$pane"` | exit 0 if scrollback shows a rate/session-limit banner (optional) |
 | `agent_<name>_resume_cmd "$id"` | the shell command that resumes that id |
 | `agent_<name>_exit_keys` | keys to send for a clean exit (interactive capture) |
 
@@ -332,6 +334,9 @@ bash tests/necro-snapshot-active-zoom-field-test.sh  # records carry zoomed/pane
 bash tests/necro-snapshot-no-tty-guard-test.sh    # exit-capture refused without a real controlling tty
 bash tests/necro-snapshot-default-idle-only-test.sh  # bare invocation defaults to idle-only, no pane disruption
 bash tests/necro-snapshot-empty-answer-aborts-test.sh  # EOF on the exit prompt aborts (q), never falls through to exit-keys
+bash tests/necro-agent-hit-limit-test.sh          # Claude/Codex limit-banner detection from scrollback
+bash tests/necro-snapshot-rate-limited-test.sh    # --rate-limited saves only limited panes; --auto skips already-saved
+bash tests/necro-watch-rate-limit-autosave-test.sh # watcher throttles auto-save; clears @necro_limit_saved on restart
 bash tests/necro-restore-layout-test.sh           # restore replays window_layout via select-layout
 bash tests/necro-restore-zoom-active-test.sh      # restore re-applies active pane, zoom (after layout), active window
 bash tests/necro-restore-resume-message-test.sh   # restore sends the post-resume message (or none if empty)

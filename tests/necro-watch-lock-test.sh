@@ -13,6 +13,7 @@ TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
 export NECROMANCER_SNAPSHOT_DIR="$TMP/snap"
+export NECROMANCER_LIMIT_CHECK_INTERVAL=0  # disable auto limit-save; this test asserts watcher behaviour
 export NECROMANCER_LOG_DIR="$TMP/logs"
 mkdir -p "$NECROMANCER_SNAPSHOT_DIR" "$NECROMANCER_LOG_DIR"
 LOCK="$NECROMANCER_SNAPSHOT_DIR/.watch.lock"

@@ -105,6 +105,17 @@ agent_codex_resume_cmd() {
   printf 'codex resume %s' "$1"
 }
 
+# Return 0 if this pane's recent scrollback shows Codex quota exhaustion.
+# Two UI forms (both from live screenshots):
+#   1. Hard stop: "You've hit your usage limit. Upgrade to Pro …"
+#   2. Soft prompt: "Approaching rate limits" (switch-model dialog)
+# Used by necro-snapshot.sh --rate-limited and the watcher's auto limit-save.
+agent_codex_hit_limit() {
+  local pane="$1"
+  tmux capture-pane -p -t "$pane" -S -80 2>/dev/null \
+    | grep -qiE 'hit your usage limit|Approaching rate limits'
+}
+
 # Codex exits cleanly on Ctrl-D / "/quit"; we use /quit for parity.
 agent_codex_exit_keys() {
   printf '/quit'

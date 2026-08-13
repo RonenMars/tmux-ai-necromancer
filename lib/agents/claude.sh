@@ -130,6 +130,15 @@ agent_claude_resume_cmd() {
   printf 'claude --resume %s' "$1"
 }
 
+# Return 0 if this pane's recent scrollback shows Claude's session-limit
+# banner ("You've hit your session limit · resets …"). Used by
+# necro-snapshot.sh --rate-limited and the watcher's auto limit-save.
+agent_claude_hit_limit() {
+  local pane="$1"
+  tmux capture-pane -p -t "$pane" -S -50 2>/dev/null \
+    | grep -qiE 'hit your session limit'
+}
+
 # Keys to send for a clean exit when capturing a live session.
 agent_claude_exit_keys() {
   printf '/exit'
