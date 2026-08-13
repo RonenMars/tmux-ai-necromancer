@@ -358,6 +358,7 @@ bash tests/necro-snapshot-default-idle-only-test.sh  # bare invocation defaults 
 bash tests/necro-snapshot-empty-answer-aborts-test.sh  # EOF on the exit prompt aborts (q), never falls through to exit-keys
 bash tests/necro-agent-hit-limit-test.sh          # Claude/Codex limit-banner detection from scrollback
 bash tests/necro-snapshot-rate-limited-test.sh    # --rate-limited saves only limited panes; --auto skips already-saved
+bash tests/necro-snapshot-rate-limited-preserve-test.sh # a no-op --auto run never deletes a save from the same second
 bash tests/necro-watch-rate-limit-autosave-test.sh # watcher throttles auto-save; clears @necro_limit_saved on restart
 bash tests/necro-restore-layout-test.sh           # restore replays window_layout via select-layout
 bash tests/necro-restore-zoom-active-test.sh      # restore re-applies active pane, zoom (after layout), active window

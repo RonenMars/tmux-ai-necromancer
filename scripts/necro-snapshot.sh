@@ -106,6 +106,14 @@ elif [ "$IDLE_ONLY" = "1" ]; then
   suffix=".idle-only"
 fi
 OUT="$SNAP_DIR/${TS}${suffix}.jsonl"
+# Did $OUT already exist before this run? TS has one-second resolution, so a
+# save from the same second resolves to the very same path. The rate-limited
+# cleanup at the end of this script deletes $OUT when it saved nothing — and
+# without this flag it would delete that earlier save instead of its own empty
+# file. The watcher runs --rate-limited --auto on a timer, so the collision is
+# reachable in normal use, not just in tests.
+OUT_PRE_EXISTING=0
+[ -e "$OUT" ] && OUT_PRE_EXISTING=1
 necro_log_event "snapshot" "start" "idle_only=$IDLE_ONLY" "assume_yes=$ASSUME_YES" "rate_limited=$RATE_LIMITED" "auto_limit=$AUTO_LIMIT" "output=$OUT"
 RATE_LIMITED_SAVED=0
 
@@ -320,7 +328,12 @@ done <<<"$snapshot"
 
 echo
 if [ "$RATE_LIMITED" = "1" ] && [ "$RATE_LIMITED_SAVED" != "1" ]; then
-  rm -f "$OUT"
+  # Only remove a file this run created. See OUT_PRE_EXISTING above.
+  if [ "$OUT_PRE_EXISTING" = "0" ]; then
+    rm -f "$OUT"
+  else
+    echo "Kept existing snapshot from this second: $OUT"
+  fi
   echo "No rate-limited panes to save."
   necro_log_event "snapshot" "complete" "output=" "rate_limited=1" "saved=0"
   exit 0
