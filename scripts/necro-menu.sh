@@ -170,10 +170,13 @@ action_resume_backup() {
   esac
 
   echo ""
-  printf 'Restore this snapshot? [y/N] '
+  # [s] hands off to necro-restore.sh --menu rather than reimplementing a
+  # picker here — one selection UI, one filter engine.
+  printf 'Restore [a]ll records, [s]elect records, or [N] cancel? '
   read -r confirm
   case "$confirm" in
-    y|Y) "$SELF_DIR/necro-restore.sh" "$chosen" ;;
+    a|A|y|Y) "$SELF_DIR/necro-restore.sh" "$chosen" ;;
+    s|S)     "$SELF_DIR/necro-restore.sh" --menu "$chosen" ;;
     *) necro_say "Cancelled." ;;
   esac
 }

@@ -34,6 +34,8 @@ SNAPSHOT=""
 DRY_RUN=0
 FORCE_LARGE=0
 ALLOW_UNSAFE_CWD=0
+ONLY_SELECTORS=""
+MENU=0
 RESUME_DELAY_OPT=""
 RESUME_BATCH_SIZE_OPT=""
 RESUME_MESSAGE_OPT_SET=0
@@ -45,6 +47,8 @@ while [ $# -gt 0 ]; do
     --dry-run) DRY_RUN=1; shift ;;
     --force-large) FORCE_LARGE=1; shift ;;
     --allow-unsafe-cwd) ALLOW_UNSAFE_CWD=1; shift ;;
+    --only) ONLY_SELECTORS="${2:-}"; shift 2 ;;
+    --menu) MENU=1; shift ;;
     --resume-delay) RESUME_DELAY_OPT="${2:-}"; shift 2 ;;
     --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
     --resume-message) RESUME_MESSAGE_OPT_SET=1; RESUME_MESSAGE_OPT="${2:-}"; shift 2 ;;
@@ -59,10 +63,21 @@ Usage:
   necro-restore.sh --dry-run        print the plan, change nothing
   necro-restore.sh --force-large    resume Claude transcripts over the size limit
   necro-restore.sh --allow-unsafe-cwd
+  necro-restore.sh --only SEL[,SEL...]     restore only the matching records
+  necro-restore.sh --menu                  pick the records interactively
   necro-restore.sh --resume-delay N        seconds between resume batches (default 5)
   necro-restore.sh --resume-batch-size N   resumes per batch before pausing (default 1)
   necro-restore.sh --resume-message STR    text sent to each pane after resume (default 'continue', '' disables)
   necro-restore.sh --resume-message-delay N  seconds to wait before that message (default 8)
+
+Selectors (--only):
+  Comma-separated. Each dispatches on its shape, and the three forms are
+  syntactically disjoint so one flag stays unambiguous:
+      %14                                    a pane id
+      1ec9e206-5619-418f-8556-72433fb60181   a session uuid
+      /path/to/project  or  *tb-mobile*      a cwd (glob allowed)
+  A record matching ANY selector is restored; the rest are left alone. A window
+  restored only in part does not get its saved layout replayed.
 
 Config:
   NECROMANCER_MAX_CLAUDE_TRANSCRIPT_BYTES or @necromancer_max_claude_transcript_bytes
@@ -100,6 +115,132 @@ command -v tmux >/dev/null || { necro_err "tmux not installed."; exit 1; }
 command -v jq   >/dev/null || { necro_err "jq not installed (brew install jq)."; exit 1; }
 
 stage() { necro_log_event "restore" "stage" "current=$1" "total=$2" "name=$3"; printf '[%d/%d] %s\n' "$1" "$2" "$3"; }
+
+# --- --only record filter ----------------------------------------------------
+# True when the record should be restored. With no --only, everything is.
+#
+# Selectors dispatch on shape rather than needing a flag each, which works
+# because the three forms can't be confused for one another: a pane id starts
+# with '%', a cwd starts with '/' or carries a glob, and anything else is a
+# uuid. Matching is ANY-of, so `--only %1,*tb-mobile*` means "that pane, plus
+# everything under tb-mobile".
+record_selected() {
+  local pane="$1" uuid="$2" cwd="$3" sel rest="$ONLY_SELECTORS"
+  [ -z "$rest" ] && return 0
+  while [ -n "$rest" ]; do
+    sel="${rest%%,*}"
+    case "$rest" in *,*) rest="${rest#*,}" ;; *) rest="" ;; esac
+    [ -z "$sel" ] && continue
+    case "$sel" in
+      %*)       [ "$sel" = "$pane" ] && return 0 ;;
+      # Unquoted $sel on purpose — it is matched as a glob against the cwd.
+      /*|*'*'*) case "$cwd" in $sel) return 0 ;; esac ;;
+      *)        [ "$sel" = "$uuid" ] && return 0 ;;
+    esac
+  done
+  return 1
+}
+
+# --- --menu: interactive record picker ---------------------------------------
+# Fills ONLY_SELECTORS by hand instead of from the command line. Deliberately
+# not a second restore path: it produces the same selector list --only accepts
+# and then falls through to the same loop, so there is one filter engine.
+# Snapshot BROWSING stays in necro-menu.sh — this picks records within the
+# snapshot already resolved.
+
+# Show the resume command and conversation preview for the picked records.
+# first_user/last_assistant are populated by necro-context.sh; empty otherwise.
+menu_preview() {
+  local picked="$1" pid ag uu cwd fu la
+  printf '\n'
+  jq -r '[.pane_id//"", .agent//"", .uuid//"", .cwd//"", .first_user//"", .last_assistant//""] | @tsv' \
+    "$SNAPSHOT" 2>/dev/null |
+  while IFS="$(printf '\t')" read -r pid ag uu cwd fu la; do
+    case "$picked" in *" $pid "*) ;; *) continue ;; esac
+    printf '  %-4s %-7s %s\n' "$pid" "${ag:--}" "$cwd"
+    [ -n "$ag" ] && [ -n "$uu" ] && printf '       resume: %s\n' "$(necro_agent_resume_cmd "$ag" "$uu")"
+    [ -n "$fu" ] && printf '       first: %.100s\n' "$fu"
+    [ -n "$la" ] && printf '       last : %.100s\n' "$la"
+  done
+}
+
+menu_pick_records() {
+  # Verify a real controlling terminal by actually OPENING it (invariant 14).
+  # `[ -t 0 ]` tests the wrong fd — necro_init_log pipes stdout through tee —
+  # and `[ -r /dev/tty ]` false-passes where there is no controlling terminal,
+  # since the permission bits satisfy access(2) even when open(2) would fail.
+  # Restore is reachable from run-shell, display-popup, launchd and cron.
+  if ! { : </dev/tty; } 2>/dev/null; then
+    necro_err "--menu needs a real terminal (not run-shell/popup/cron). Use --only instead."
+    exit 2
+  fi
+
+  local ids labels n=0 k pid sess widx wname ag uu cwd
+  ids=(); labels=()
+  while IFS="$(printf '\t')" read -r pid sess widx wname ag uu cwd; do
+    [ -z "$pid" ] && continue
+    n=$((n + 1))
+    ids[$n]="$pid"
+    labels[$n]="$(printf '%-4s %-9s %-24.24s %-7s %-8.8s %s' \
+      "$pid" "${sess}:${widx}" "${wname:--}" "${ag:--}" "${uu:--}" "$cwd")"
+  done <<EOF
+$(jq -r '[.pane_id//"", (.session|tostring), (.window_index|tostring),
+          .window_name//"", .agent//"", .uuid//"", .cwd//""] | @tsv' \
+     "$SNAPSHOT" 2>/dev/null)
+EOF
+
+  [ "$n" -gt 0 ] || { necro_err "Snapshot has no usable records."; exit 1; }
+
+  # Selection is a space-delimited string of pane ids, not an associative
+  # array: macOS ships /bin/bash 3.2 (invariant 13). Starts with everything
+  # selected, so Enter alone behaves like a plain restore.
+  local picked=" " reply rebuilt x sel
+  k=1; while [ "$k" -le "$n" ]; do picked="$picked${ids[$k]} "; k=$((k + 1)); done
+
+  while :; do
+    printf '\n'
+    necro_say "Records in $(basename "$SNAPSHOT")"
+    k=1; while [ "$k" -le "$n" ]; do
+      case "$picked" in
+        *" ${ids[$k]} "*) printf '  [x] %2d  %s\n' "$k" "${labels[$k]}" ;;
+        *)                printf '  [ ] %2d  %s\n' "$k" "${labels[$k]}" ;;
+      esac
+      k=$((k + 1))
+    done
+    printf '\n  <number> toggle  ·  a=all  ·  c=clear  ·  p=preview  ·  Enter=restore  ·  q=abort\n  > '
+    # EOF (a closed or vanished tty) must abort, never fall through to
+    # restoring — the same failure the snapshot exit-prompt bug had.
+    read -r reply </dev/tty || reply="q"
+    case "$reply" in
+      "")  break ;;
+      q|Q) necro_say "Cancelled."; exit 0 ;;
+      a|A) picked=" "; k=1; while [ "$k" -le "$n" ]; do picked="$picked${ids[$k]} "; k=$((k + 1)); done ;;
+      c|C) picked=" " ;;
+      p|P) menu_preview "$picked" ;;
+      *[!0-9]*) necro_warn "Not a number: $reply" ;;
+      *)
+        if [ "$reply" -ge 1 ] && [ "$reply" -le "$n" ]; then
+          case "$picked" in
+            *" ${ids[$reply]} "*)
+              rebuilt=" "
+              for x in $picked; do [ "$x" = "${ids[$reply]}" ] || rebuilt="$rebuilt$x "; done
+              picked="$rebuilt" ;;
+            *) picked="$picked${ids[$reply]} " ;;
+          esac
+        else
+          necro_warn "Out of range: $reply"
+        fi ;;
+    esac
+  done
+
+  sel=""
+  k=1; while [ "$k" -le "$n" ]; do
+    case "$picked" in *" ${ids[$k]} "*) sel="${sel:+$sel,}${ids[$k]}" ;; esac
+    k=$((k + 1))
+  done
+  [ -n "$sel" ] || { necro_say "Nothing selected — nothing to do."; exit 0; }
+  ONLY_SELECTORS="$sel"
+}
 
 progress_record() {
   local current="$1" total="$2" message="$3"
@@ -246,6 +387,10 @@ if [ -z "$SNAPSHOT" ]; then
 fi
 [ -f "$SNAPSHOT" ] || { necro_err "No snapshot found (looked in $SNAP_DIR)."; exit 1; }
 
+# Interactive picker runs before anything is read or touched; it only fills in
+# ONLY_SELECTORS, so everything downstream is the plain --only path.
+[ "$MENU" = "1" ] && menu_pick_records
+
 stage 2 5 "reading snapshot"
 total_records="$(grep -cve '^[[:space:]]*$' "$SNAPSHOT" 2>/dev/null || true)"
 total_records="${total_records:-0}"
@@ -268,6 +413,7 @@ if [ -n "$resume_message" ]; then
 else
   echo "  Post-resume message: (none)"
 fi
+[ -n "$ONLY_SELECTORS" ] && echo "  Only: $ONLY_SELECTORS"
 echo "  Force large Claude transcripts: $FORCE_LARGE"
 echo "  Allow unsafe cwd paths: $ALLOW_UNSAFE_CWD"
 echo "  Unsafe cwd patterns: $(unsafe_cwd_patterns || true)"
@@ -325,7 +471,7 @@ ensure_session() {
 }
 
 stage 3 5 "validating records"
-restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; i=0
+restored=0; reused=0; resumed=0; skipped=0; resume_skipped=0; invalid=0; filtered=0; i=0
 # Window created/claimed for each (session, window_index) THIS run. Later records
 # in the same group split into that window instead of adding a new one.
 #
@@ -388,6 +534,18 @@ while IFS= read -r line; do
     continue
   fi
 
+  # Group bookkeeping runs BEFORE the --only filter: the layout replay has to
+  # know how many panes the window had in the snapshot, not just how many were
+  # selected, so a partially-restored window can be told apart from a whole one.
+  group="${session}|${win_idx}"
+  group_set "$group" full_count "$(( $(group_get "$group" full_count 0) + 1 ))"
+
+  if ! record_selected "$pane_id" "$uuid" "$cwd"; then
+    progress_record "$i" "$total_records" "filtered out $session/${win_name:-?} (--only)"
+    filtered=$((filtered + 1))
+    continue
+  fi
+
   # Sanitize window name: tmux disallows '/' in -t targets; trim noise.
   safe_name="${win_name%%:*}"
   safe_name="$(printf '%s' "$safe_name" | sed -e 's/[[:space:]⚡]*$//' -e 's#/#-#g')"
@@ -395,9 +553,19 @@ while IFS= read -r line; do
 
   progress_record "$i" "$total_records" "restoring $session/$safe_name  (agent=${agent:-none} cwd=$cwd)"
 
+  # Conversation preview, dry-run only — that is where the question is "is this
+  # the session I meant?", and it is what necro-menu.sh shows before asking you
+  # to confirm. Both fields are filled by necro-context.sh; empty otherwise, in
+  # which case nothing is printed rather than a blank label.
+  if [ "$DRY_RUN" = "1" ]; then
+    first_user=$(jq -r '.first_user // empty' <<<"$line")
+    last_assistant=$(jq -r '.last_assistant // empty' <<<"$line")
+    [ -n "$first_user" ]      && printf '  first: %.100s\n' "$first_user"
+    [ -n "$last_assistant" ]  && printf '  last : %.100s\n' "$last_assistant"
+  fi
+
   # Per-record stable marker. Falls back to pane_id when there's no uuid.
   mark="${cwd}|${uuid:-$pane_id}"
-  group="${session}|${win_idx}"
 
   # Track saved pane count + layout per group for the post-loop layout replay.
   group_set "$group" count "$(( $(group_get "$group" count 0) + 1 ))"
@@ -558,6 +726,16 @@ while IFS= read -r group; do
   [ -z "$win" ] && continue
   case "$win" in *:dry) continue ;; esac
   saved="$(group_get "$group" count 0)"
+  full="$(group_get "$group" full_count 0)"
+  # A window restored only in part must not get its saved layout replayed: that
+  # string describes the WHOLE window, so applying it to a subset would either
+  # fail outright or squeeze the survivors into cells meant for panes that
+  # aren't there. The live-count guard below can't catch this on its own —
+  # restore 1 of 2 panes and live == saved == 1 looks like a perfect match.
+  if [ "$full" != "$saved" ]; then
+    echo "  layout skipped for $group: partial selection ($saved of $full panes)"
+    continue
+  fi
   if [ "$DRY_RUN" = "1" ]; then
     echo "  DRY: select-layout -t $win $layout"
     continue
@@ -599,6 +777,6 @@ EOF
 
 stage 5 5 "cleanup"
 necro_hr
-necro_ok "Done. windows added: $restored, reused: $reused, agents resumed: $resumed, resume skipped: $resume_skipped, records skipped: $skipped, invalid: $invalid"
-necro_log_event "restore" "complete" "restored=$restored" "reused=$reused" "resumed=$resumed" "skipped=$skipped"
+necro_ok "Done. windows added: $restored, reused: $reused, agents resumed: $resumed, resume skipped: $resume_skipped, records skipped: $skipped, filtered out: $filtered, invalid: $invalid"
+necro_log_event "restore" "complete" "restored=$restored" "reused=$reused" "resumed=$resumed" "skipped=$skipped" "filtered=$filtered"
 [ "$DRY_RUN" = "1" ] || tmux list-sessions 2>/dev/null || true

@@ -8,6 +8,8 @@
 | Save rate-limited Claude/Codex panes | `necro-snapshot.sh --rate-limited` (also menu `[6]`; watcher auto-saves every `@necromancer_limit_check_interval` s) |
 | Restore a specific snapshot | `necro-restore.sh <file.jsonl>` |
 | Dry-run a restore | `necro-restore.sh --dry-run` |
+| Restore only some records | `necro-restore.sh --only %14,*tb-mobile*` |
+| Pick records interactively | `necro-restore.sh --menu` |
 | Before reboot | `necro-reboot-prep.sh` (or `safe-reboot` / `safe-shutdown` aliases) |
 | After reboot | `necro-reboot-resume.sh` |
 | Check the plugin's health | `necro-doctor.sh` (read-only) |
@@ -23,6 +25,49 @@ ones you use.
 `necro-restore.sh` restores a snapshot you choose explicitly. `necro-reboot-resume.sh`
 is the reboot wrapper behind `necro-resume`; it finds the pinned reboot snapshot,
 ensures tmux is up, then calls restore for you.
+
+## Restoring part of a snapshot
+
+By default a restore rebuilds every record in the snapshot. `--only` narrows it
+to the ones you name. Selectors are comma-separated and dispatch on shape, so
+one flag covers all three without ambiguity:
+
+| Selector | Matches | Example |
+|---|---|---|
+| `%14` | a pane id | `--only %14` |
+| a uuid | that session | `--only 1ec9e206-5619-418f-8556-72433fb60181` |
+| a path or glob | the record's cwd | `--only '*tb-mobile*'` |
+
+A record matching **any** selector is restored; the rest are reported as
+`filtered out` and left alone.
+
+```bash
+necro-restore.sh --only '*tb-mobile*' --dry-run   # preview one project
+necro-restore.sh --only %14,%20                   # two specific panes
+```
+
+`--menu` is the interactive way to produce the same selection — a checkbox list
+of the snapshot's records:
+
+```
+  [x]  1  %14  2:3   ai-tools/tb-mobile-main   claude  964f4dfe  ~/dev/ai-tools/tb-mobile
+  [ ]  2  %33  2:6   mob1: tb-mobile-android   codex   019ff52b  ~/dev/ai-tools/tb-mobile
+
+  <number> toggle  ·  a=all  ·  c=clear  ·  p=preview  ·  Enter=restore  ·  q=abort
+```
+
+`p` shows each selected record's resume command plus its first user message and
+last assistant reply, when the snapshot has been enriched by `necro-context.sh`.
+Everything starts selected, so `--menu` then Enter is a plain full restore.
+
+It needs a real terminal, so it refuses under `run-shell`, `display-popup`,
+launchd and cron — use `--only` there. `necro-menu.sh` action `[2]` offers the
+same picker via its `[s]elect records` answer.
+
+**Layouts and partial restores:** a window whose panes you restore only some of
+does not get its saved layout replayed — that layout describes the whole
+window. Restore says so rather than doing it silently:
+`layout skipped for 2|5: partial selection (1 of 2 panes)`.
 
 `necro-apply.sh` is different: it operates on **live** panes rather than
 rebuilding dead ones, moving each recorded pane's window into a destination

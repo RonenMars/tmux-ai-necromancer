@@ -18,7 +18,8 @@ scripts/                   the executables (all source lib/*.sh)
   necro-autosave-daemon.sh autosave scheduler, independent of status-right
   necro-watch.sh           one-tick pane watcher — pins @necro_uuid/@necro_agent; throttled rate-limit auto-save
   necro-watch-daemon.sh    watcher scheduler, independent of status-right
-  necro-restore.sh         rebuild sessions/windows from a snapshot (IDEMPOTENT)
+  necro-restore.sh         rebuild sessions/windows from a snapshot (IDEMPOTENT;
+                           --only narrows to chosen records, --menu picks them)
   necro-apply.sh           reorganize LIVE panes into dest sessions + resume
   necro-context.sh         enrich a snapshot with conversation previews
   necro-reboot-prep.sh     pre-reboot: snapshot + enrich + resurrect save + pin pointer
@@ -327,6 +328,10 @@ bash tests/necro-watch-escaped-separator-test.sh  # pane walk survives tmux 3.5a
 bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp doesn't drift across ticks
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit
+bash tests/necro-restore-only-filter-test.sh      # --only restores just the named records (pane id / uuid / cwd glob)
+bash tests/necro-restore-only-layout-test.sh      # a partially-restored window never gets its whole-window layout replayed
+bash tests/necro-restore-menu-no-tty-test.sh      # --menu refuses without a real tty, and changes nothing
+bash tests/necro-menu-select-records-test.sh      # menu [2] '[s]elect records' really reaches the picker
 bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
@@ -382,7 +387,11 @@ Key things to verify after any change to restore/snapshot:
 - restoring multiple sessions pauses between resumes — doesn't fire every
   `claude`/`codex --resume` back-to-back
 - restored multi-pane windows get their saved layout re-applied
-  (`select-layout`) only when the live pane count matches the snapshot's
+  (`select-layout`) only when the live pane count matches the snapshot's, and
+  never when `--only` restored just part of the window — the saved string
+  describes the whole one, and a partial selection makes live == saved look
+  like a match (1 of 2 panes restored, 1 pane live), so the pre-filter record
+  count is what tells them apart
 - the saved active pane/window and zoom state come back too — zoom re-applied
   AFTER the layout replay (`select-layout` unzooms), and only for windows this
   run created/claimed, never a live reused window
