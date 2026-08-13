@@ -84,6 +84,17 @@ necro_agent_alive_in_pane() {
 # reads as "exhausted" (a fresh session never gets pinned), and idx=1 into
 # [new, old] re-hands the old id that is already pinned to another pane.
 # Storing ids makes the pop idempotent under any reordering of the listing.
+#
+# The cursor alone is not enough, though: it only knows the ids IT handed out.
+# An id resolved from process argv or scrollback never reaches the cursor file,
+# and min_epoch can't reject it either — a live session's transcript is being
+# written right now, so it is always the freshest candidate in its cwd. Hence
+# the second filter below, against the ids currently pinned to live panes.
+necro_live_pinned_uuids() {
+  tmux list-panes -a -F '#{@necro_uuid}' 2>/dev/null | grep -v '^$'
+  return 0  # no tmux / no server / nothing pinned: the cursor still applies
+}
+
 necro_agent_pop_session_id() {
   local agent="$1" cwd="$2" min_epoch="${3:-}"
   declare -f "agent_${agent}_all_session_ids" >/dev/null 2>&1 || return 0
@@ -93,11 +104,18 @@ necro_agent_pop_session_id() {
   # Safe filename: replace non-alnum with _.
   local key; key="$(printf '%s:%s' "$agent" "$cwd" | tr -cs 'a-zA-Z0-9' '_')"
   local cursor_file="$cursor_dir/$key"
+  # One tmux call per pop, and a pop only happens for a pane that has no pin
+  # and no argv/scrollback id — never in the steady state the tick-cost
+  # invariant guards.
+  local live_pins; live_pins="$(necro_live_pinned_uuids)"
   local id
   while IFS= read -r id; do
     [ -n "$id" ] || continue
     if [ -f "$cursor_file" ] && grep -qxF "$id" "$cursor_file" 2>/dev/null; then
       continue  # already handed out
+    fi
+    if [ -n "$live_pins" ] && grep -qxF "$id" <<<"$live_pins"; then
+      continue  # another live pane is already running this session
     fi
     printf '%s' "$id"
     printf '%s\n' "$id" >> "$cursor_file" 2>/dev/null
