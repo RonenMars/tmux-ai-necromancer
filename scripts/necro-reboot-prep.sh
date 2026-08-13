@@ -94,7 +94,12 @@ else
   if [ "$MODE" = "idle-only" ]; then
     SNAPSHOT_FILE="$(/bin/ls -t "$SNAP_DIR"/*.idle-only.jsonl 2>/dev/null | head -1)"
   else
-    SNAPSHOT_FILE="$(/bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null | grep -v idle-only | grep -v enriched | head -1)"
+    # rate-limited captures are excluded alongside idle-only and enriched: they
+    # hold only the panes that hit a quota banner — as few as one record — and
+    # the watcher writes them on a timer, so one can easily be newer than the
+    # snapshot this run just took. Pinning one as the reboot target would have
+    # the next resume rebuild a single pane and call the machine restored.
+    SNAPSHOT_FILE="$(/bin/ls -t "$SNAP_DIR"/*.jsonl 2>/dev/null | grep -v idle-only | grep -v enriched | grep -v rate-limited | head -1)"
   fi
   [ -f "$SNAPSHOT_FILE" ] || { necro_err "No snapshot produced."; exit 1; }
   necro_ok "Snapshot: $SNAPSHOT_FILE"
