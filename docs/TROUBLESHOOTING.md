@@ -29,6 +29,35 @@ watcher is falling back to filesystem guesses. Note that a daemon can be
 running while doing no work — a wedged lock produces exactly that — so
 "daemon running" alone is not a clean bill of health.
 
+### Running it unattended
+
+The 2026-07 outage was continuously visible for 4½ days; what was missing was
+anyone looking. Doctor is built to be scheduled: it is read-only, it exits 1
+only on a `✗`, and with **no tmux server running it reports warnings and still
+exits 0** — so a timer that fires while tmux is down does not cry wolf.
+
+That makes the whole unattended story "run it on a schedule and make a non-zero
+exit interrupt you". On macOS, a `~/Library/LaunchAgents` job every 30 minutes:
+
+```xml
+<key>ProgramArguments</key>
+<array>
+  <string>/bin/sh</string>
+  <string>-c</string>
+  <string>PATH=/opt/homebrew/bin:/usr/bin:/bin ~/.tmux/plugins/tmux-ai-necromancer/scripts/necro-doctor.sh || osascript -e 'display notification "necro-doctor found a problem" with title "necromancer"'</string>
+</array>
+<key>StartInterval</key><integer>1800</integer>
+```
+
+Set `PATH` explicitly — launchd does not inherit your shell's, and doctor needs
+`tmux`, `jq` and `python3`. On Linux use a systemd timer or a cron entry the
+same way.
+
+Do **not** have it append to a file instead. An hourly sampler was already
+tried, wrote `lock=present` on 23 of 24 samples during the outage, and lost
+because nobody opened the file. Route failures somewhere that interrupts you,
+or don't bother scheduling it.
+
 ## Sessions missing after reboot
 
 **Symptom:** `necro-resume` restores only a handful of sessions; most are gone.
