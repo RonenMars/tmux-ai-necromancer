@@ -67,8 +67,17 @@ export PATH="$TMPBIN:$PATH"
 # `timeout(1)` is a GNU-coreutils binary, not present on stock macOS — bound
 # the wait with plain bash instead: background the process, poll for exit,
 # kill it if it's still alive past the deadline.
-script -q /dev/null bash "$ROOT/scripts/necro-snapshot.sh" --interactive \
-    </dev/null >"$TMP/out.log" 2>&1 &
+# The two `script` implementations take the command in incompatible ways:
+# BSD/macOS is `script -q <typescript> <cmd> [args...]`, util-linux/GNU is
+# `script -q -c "<cmd>" <typescript>` and would read `bash` as the typescript
+# file. Pick by implementation, not by platform name.
+if script --version 2>/dev/null | grep -qi util-linux; then
+  script -q -c "bash '$ROOT/scripts/necro-snapshot.sh' --interactive" /dev/null \
+      </dev/null >"$TMP/out.log" 2>&1 &
+else
+  script -q /dev/null bash "$ROOT/scripts/necro-snapshot.sh" --interactive \
+      </dev/null >"$TMP/out.log" 2>&1 &
+fi
 runner_pid=$!
 deadline=10
 elapsed=0

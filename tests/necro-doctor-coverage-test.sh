@@ -44,6 +44,21 @@ esac
 EOF
 chmod +x "$TMP/bin/tmux"
 
+# pgrep stub: both daemons alive. Without it the doctor reads the HOST process
+# table, so the test passes on a developer box that happens to be running
+# necromancer and fails anywhere else (CI, a fresh clone, a contributor's
+# laptop) — the daemon check reports a real problem and exit goes to 1, which
+# has nothing to do with the coverage assertion under test.
+cat > "$TMP/bin/pgrep" <<'EOF'
+#!/bin/sh
+case "$*" in
+  *necro-autosave-daemon.sh*) echo 4242 ;;
+  *necro-watch-daemon.sh*)    echo 4243 ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$TMP/bin/pgrep"
+
 run_doctor() {
   PATH="$TMP/bin:$PATH" NECROMANCER_SNAPSHOT_DIR="$SNAP" \
     /bin/bash "$ROOT/scripts/necro-doctor.sh" 2>&1

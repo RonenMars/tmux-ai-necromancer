@@ -1,0 +1,44 @@
+name: tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  bash-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      # macOS runners preinstall Homebrew bash 5 ahead of /bin/bash on PATH, so
+      # `#!/usr/bin/env bash` would never reach the stock 3.2 a clean Mac has.
+      # Shadow it so this leg really enforces invariant 13 (no bash-4 constructs).
+      - name: Force stock bash 3.2 onto PATH
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p "$RUNNER_TEMP/bash32"
+          ln -sf /bin/bash "$RUNNER_TEMP/bash32/bash"
+          echo "$RUNNER_TEMP/bash32" >> "$GITHUB_PATH"
+
+      - name: Show bash version
+        run: bash --version | head -1
+
+      - name: Syntax check every script
+        run: |
+          for f in scripts/*.sh lib/*.sh lib/agents/*.sh *.tmux; do
+            bash -n "$f" || exit 1
+          done
+
+      - name: Run test suite
+        run: |
+          fail=0
+          for t in tests/*-test.sh; do
+            echo "== $t"
+            bash "$t" || { echo "FAILED: $t"; fail=1; }
+          done
+          exit $fail

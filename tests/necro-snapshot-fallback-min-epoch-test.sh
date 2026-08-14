@@ -29,19 +29,26 @@ mkdir -p "$HOME" "$NECROMANCER_SNAPSHOT_DIR"
 NOW="$(date +%s)"
 FIRST_SEEN=$((NOW - 300))     # pane's agent first seen 5 min ago
 
+# Set a file's mtime from an epoch. BSD spells it `date -r EPOCH`, GNU spells
+# it `date -d @EPOCH` and reads -r as a reference FILE, so the bare BSD form
+# fails on Linux/WSL2 and the touch then silently stamps "now" instead.
+touch_epoch() { # touch_epoch <epoch> <file>
+  touch -t "$(date -r "$1" +%Y%m%d%H%M.%S 2>/dev/null || date -d "@$1" +%Y%m%d%H%M.%S)" "$2"
+}
+
 STALE_CWD="$TMP/stale"
 STALE_UUID="11111111-1111-1111-1111-111111111111"
 mkdir -p "$STALE_CWD" "$(agent_claude_project_dir "$STALE_CWD")"
 STALE_FILE="$(agent_claude_project_dir "$STALE_CWD")/$STALE_UUID.jsonl"
 printf '{"role":"user"}\n' > "$STALE_FILE"
-touch -t "$(date -r $((FIRST_SEEN - 600)) +%Y%m%d%H%M.%S)" "$STALE_FILE"
+touch_epoch $((FIRST_SEEN - 600)) "$STALE_FILE"
 
 FRESH_CWD="$TMP/fresh"
 FRESH_UUID="22222222-2222-2222-2222-222222222222"
 mkdir -p "$FRESH_CWD" "$(agent_claude_project_dir "$FRESH_CWD")"
 FRESH_FILE="$(agent_claude_project_dir "$FRESH_CWD")/$FRESH_UUID.jsonl"
 printf '{"role":"user"}\n' > "$FRESH_FILE"
-touch -t "$(date -r $((FIRST_SEEN + 60)) +%Y%m%d%H%M.%S)" "$FRESH_FILE"
+touch_epoch $((FIRST_SEEN + 60)) "$FRESH_FILE"
 
 TMPBIN="$TMP/bin"
 mkdir -p "$TMPBIN"

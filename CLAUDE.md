@@ -129,6 +129,18 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    correct there; it also breaks a >60s-old lock, since a SIGKILLed watcher
    would otherwise wedge UUID pinning forever with no error anywhere.
 
+   **That trap does not fire at all under bash 3.2, so the subshell must ALSO
+   release the lock explicitly on its last line.** bash 3.2 never runs an EXIT
+   trap installed inside a *backgrounded* subshell — `{ trap ... EXIT; sleep
+   1; } &` fires in bash 5 and is silently skipped in 3.2 (minimal repro, not
+   inference). Since stock macOS bash is 3.2 (invariant 13), the trap released
+   nothing on the plugin's most common platform: every autosave leaked its
+   lock and the pid-stamp reclaim path below — built for crash recovery —
+   silently carried normal operation instead. Keep both: the explicit
+   `release_lock` covers the ordinary path everywhere, the trap covers signals
+   on bash 4+. Covered by `necro-autosave-lock-lifetime-test.sh` when it runs
+   under 3.2, which is what the CI macOS leg exists to do.
+
    **A trap is not enough — every lock also needs RECOVERY.** A signal the trap
    can't catch leaves the lock held forever, and the failure is silent: each
    later tick exits on "lock held" while the daemon still reports as running.
@@ -320,6 +332,24 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     at 3.6. Covered by `necro-watch-escaped-separator-test.sh` and
     `tui/internal/tmux/parse_panes_test.go`.
 
+16. **Read mtimes through `necro_file_mtime`, never a raw `stat` pair.** The
+    natural-looking portable spelling — `stat -f %m "$f" 2>/dev/null || stat -c
+    %Y "$f"` — is wrong on Linux/WSL2 in a way that produces no error. GNU's
+    `-f` is `--file-system`, so `%m` is parsed as a second OPERAND: stat writes
+    the *filesystem* report for `$f` to stdout, exits non-zero over the missing
+    file named `%m`, and the `||` fallback appends the real epoch to that
+    output. The caller ends up with a multi-word string, and every consumer
+    degrades quietly rather than failing: invariant 9's `min_epoch` staleness
+    filter stopped rejecting ANY transcript on Linux (both min-epoch tests
+    failed the moment CI ran them there), the 60s lock-age recovery in
+    `necro-autosave.sh`/`necro-watch.sh` never fired, and `necro-doctor.sh`
+    died early enough that every one of its checks reported failure. Order
+    matters and only one order is safe: BSD stat rejects `-c` cleanly (exit 1,
+    empty stdout), so GNU-first falls back correctly on macOS, while
+    BSD-first — the old code — cannot. The helper lives in `lib/common.sh`;
+    call it rather than re-deriving the pair. Covered by
+    `necro-file-mtime-test.sh` on both platforms.
+
 ## Triaging a broken environment
 
 Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
@@ -389,6 +419,7 @@ bash tests/necro-agent-claude-matches-test.sh     # @necromancer_claude_commands
 bash tests/necro-doctor-test.sh                   # doctor counts snapshot records, is read-only, exits 1 only on real problems
 bash tests/necro-doctor-coverage-test.sh          # doctor warns when the newest snapshot doesn't cover the live server
 bash tests/necro-autosave-stale-lock-test.sh      # the autosave work lock self-heals; a live owner is still respected
+bash tests/necro-file-mtime-test.sh               # necro_file_mtime returns one clean epoch integer (GNU and BSD stat)
 bash tests/necro-autosave-daemon-lock-test.sh     # autosave daemon lock: one daemon per server
 bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually starts the autosave daemon
 bash tests/necro-restore-keybind-test.sh          # restore binds prefix+ai via a key-table; single-key override still works

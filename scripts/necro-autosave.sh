@@ -80,7 +80,7 @@ if ! mkdir "$LOCK_DIR" 2>/dev/null; then
     # No pid recorded. Either a run that just won mkdir and hasn't stamped it
     # yet (microseconds), or a lock left by a pre-upgrade version that never
     # wrote one. Age separates them, so an old plugin's wedge still self-heals.
-    lock_mtime="$(stat -f %m "$LOCK_DIR" 2>/dev/null || stat -c %Y "$LOCK_DIR" 2>/dev/null)"
+    lock_mtime="$(necro_file_mtime "$LOCK_DIR")"
     if [ -n "$lock_mtime" ] && [ "$(( now - lock_mtime ))" -le 60 ]; then
       necro_log_event "autosave" "skip" "reason=lock_starting"
       exit 0
@@ -104,10 +104,19 @@ if necro_debug_enabled; then
 else
   exec 4> /dev/null
 fi
+release_lock() { rm -f "$LOCK_DIR/pid"; rmdir "$LOCK_DIR" 2>/dev/null || true; }
 {
   # The lock is held for the LIFETIME OF THIS SUBSHELL — the work, not just the
   # setup above. Released on any exit path (success, error, kill).
-  trap 'rm -f "$LOCK_DIR/pid"; rmdir "$LOCK_DIR" 2>/dev/null' EXIT
+  #
+  # The trap alone is NOT enough: bash 3.2 never runs an EXIT trap installed
+  # inside a BACKGROUNDED subshell (`{ trap ... EXIT; sleep 1; } &` fires in
+  # bash 5 and is silently skipped in 3.2), so on a stock Mac — the default
+  # interpreter per invariant 13 — this released nothing and every run leaked
+  # its lock, leaving the pid-stamp reclaim path below (built for crashes) to
+  # carry normal operation. The explicit call at the end of the subshell covers
+  # the ordinary path on every bash; the trap still covers signals on bash 4+.
+  trap 'release_lock' EXIT
   # Stamp our pid so a later run can tell "still working" from "died holding
   # it". $$ is the PARENT's pid inside a subshell and BASHPID is bash 4+
   # (invariant 13), so ask a child for its parent instead.
@@ -166,6 +175,7 @@ fi
     tail -n 5000 "$LOG" > "${LOG}.tmp" && mv "${LOG}.tmp" "$LOG"
     echo "[$(necro_ts)] log rotated to 5000 lines"
   fi
+  release_lock
 } >&4 &
 exec 4>&-
 
