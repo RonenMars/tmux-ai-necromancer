@@ -70,7 +70,7 @@ fi
 WATCH_LOCK="$(necro_snapshot_dir)/.watch.lock"
 mkdir -p "$(dirname "$WATCH_LOCK")" 2>/dev/null || true
 if [ -d "$WATCH_LOCK" ]; then
-  lock_mtime="$(stat -f %m "$WATCH_LOCK" 2>/dev/null || stat -c %Y "$WATCH_LOCK" 2>/dev/null)"
+  lock_mtime="$(necro_file_mtime "$WATCH_LOCK")"
   if [ -n "$lock_mtime" ] && [ "$(( now - lock_mtime ))" -gt 60 ]; then
     rmdir "$WATCH_LOCK" 2>/dev/null || true
   fi

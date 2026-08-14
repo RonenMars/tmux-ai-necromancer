@@ -58,7 +58,7 @@ agent_codex_all_session_ids() {
   while IFS= read -r f; do
     [ -n "$f" ] || continue
     if [ -n "$min_epoch" ]; then
-      mtime="$(stat -f %m "$f" 2>/dev/null || stat -c %Y "$f" 2>/dev/null)"
+      mtime="$(necro_file_mtime "$f")"
       [ -n "$mtime" ] && [ "$mtime" -lt "$min_epoch" ] && continue
     fi
     local id

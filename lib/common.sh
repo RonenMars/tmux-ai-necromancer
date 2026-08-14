@@ -236,6 +236,21 @@ necro_hr()   { printf '\n\033[2m────────────────
 # Timestamp for log lines.
 necro_ts() { date '+%Y-%m-%d %H:%M:%S'; }
 
+# Mtime of a file or directory, in epoch seconds. GNU first, BSD second.
+#
+# The obvious spelling — `stat -f %m "$f" || stat -c %Y "$f"` — is broken on
+# Linux, and silently. GNU's `-f` is --file-system, so `%m` is read as a second
+# OPERAND: stat prints the filesystem info for "$f" on stdout, fails on the
+# missing file named `%m`, and the `||` fallback then APPENDS the real mtime to
+# that garbage. Callers got "...4096 1755200000" and every comparison against
+# it misbehaved — the min_epoch staleness filter of invariant 9 stopped
+# rejecting anything on Linux/WSL2, and the 60s lock-age recovery never fired.
+# BSD stat fails cleanly on `-c` (exit 1, nothing on stdout), so GNU-first is
+# safe both ways; the reverse order is not.
+necro_file_mtime() {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1" 2>/dev/null
+}
+
 # --- JSON ------------------------------------------------------------------
 # JSON-encode a string safely (handles unicode + control chars) via python3.
 necro_json_escape() {

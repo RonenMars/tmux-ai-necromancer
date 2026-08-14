@@ -59,7 +59,7 @@ warn()    { printf '  \033[1;33m⚠\033[0m %s\n' "$1"; WARNINGS=$((WARNINGS + 1)
 bad()     { printf '  \033[1;31m✗\033[0m %s\n' "$1"; PROBLEMS=$((PROBLEMS + 1)); }
 note()    { printf '      %s\n' "$1"; }
 
-file_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+file_mtime() { necro_file_mtime "$1"; }
 
 # Seconds -> "4d 3h" / "2h 5m" / "45s". Keeps report lines scannable.
 human_age() {
