@@ -170,9 +170,22 @@ wait_for_shell() {
 #
 # The cursor dir is per-run here (mktemp'd in Main), so the first caller for a
 # cwd still gets the newest id, exactly as `latest` did.
+#
+# The pane's @necro_pane_first_seen stamp is passed as min_epoch, exactly as
+# necro-watch.sh does: a transcript last written before this pane's agent
+# existed cannot be that pane's session. Without it the pop's other two filters
+# both miss the common case — the cursor only knows ids IT handed out this run,
+# and the live-pin set stops covering an id the moment the pane holding it
+# releases it (a /clear starts a new session id and abandons the old one). A
+# pane created minutes later then reads that dead transcript as the newest in
+# the cwd and adopts it. Observed on a real server: pane %49's first snapshot
+# recorded a conversation whose last write predated the pane by 13 minutes.
+# Empty stamp (watcher not running, pane never walked) degrades to the old
+# unfiltered behaviour rather than refusing to resolve.
 resolve_fallback_id() {
-  local agent="$1" cwd="$2"
-  necro_agent_pop_session_id "$agent" "$cwd" 2>/dev/null || true
+  local agent="$1" cwd="$2" pane_id="$3" min_epoch
+  min_epoch="$(tmux show-option -pqv -t "$pane_id" @necro_pane_first_seen 2>/dev/null || true)"
+  necro_agent_pop_session_id "$agent" "$cwd" "$min_epoch" 2>/dev/null || true
 }
 
 # --- Main -------------------------------------------------------------------
@@ -216,7 +229,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
       fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
       fb_source="pane-option"
       if [ -z "$fb" ]; then
-        fb="$(resolve_fallback_id "$agent" "$cwd")"
+        fb="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
         fb_source="latest-jsonl"
       fi
       if [ -n "$fb" ]; then
@@ -266,7 +279,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
     fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
     fb_source="pane-option"
     if [ -z "$fb" ]; then
-      fb="$(resolve_fallback_id "$agent" "$cwd")"
+      fb="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
       fb_source="latest-jsonl"
     fi
     if [ -n "$fb" ]; then
@@ -292,7 +305,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
   case "$ans" in
     q|Q) echo "  aborted by user"; break ;;
     s|S|n|N)
-      fb="$(resolve_fallback_id "$agent" "$cwd")"
+      fb="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
       if [ -n "$fb" ]; then
         echo "  skipped — fallback id: $fb"
         emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl" "$layout" "$zoomed" "$pactive" "$wactive"
@@ -316,7 +329,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
   if [ -n "$uuid" ]; then
     echo "  captured id from scrollback: $uuid"; uuid_source="scrollback"
   else
-    uuid="$(resolve_fallback_id "$agent" "$cwd")"
+    uuid="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
     if [ -n "$uuid" ]; then
       echo "  WARN: no id in scrollback; using fallback: $uuid"; uuid_source="latest-jsonl"
     else

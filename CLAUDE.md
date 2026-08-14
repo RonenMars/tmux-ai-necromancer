@@ -187,6 +187,24 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    — so neither is redundant. Covered by
    `necro-agent-pop-live-pin-test.sh`.
 
+   **`necro-snapshot.sh` has its OWN copy of this fallback and must pass
+   `min_epoch` too.** Its `resolve_fallback_id` popped an id with no
+   `min_epoch` for years, so the `latest-jsonl` path — the one used for any
+   live agent pane the watcher hasn't pinned yet — had no staleness filter at
+   all. Neither of the other two filters covers the gap: the snapshot's cursor
+   dir is `mktemp`'d per run, so it only knows ids handed out in that run, and
+   the live-pin set stops covering an id the moment the pane holding it
+   releases it (a `/clear` starts a new session id and abandons the old one).
+   A pane created minutes later then reads that abandoned transcript as the
+   newest in the cwd and adopts it. Observed on a real server: pane `%49`'s
+   first snapshot recorded `uuid_source=latest-jsonl` for a conversation last
+   written 13 minutes before the pane existed; the watcher corrected it one
+   tick later, so exactly one snapshot carried the wrong session — enough for
+   a restore from that window to resume a dead conversation and lose the real
+   one. The stamp comes from the pane's `@necro_pane_first_seen`; an empty
+   stamp degrades to the old unfiltered behaviour rather than refusing to
+   resolve. Covered by `necro-snapshot-fallback-min-epoch-test.sh`.
+
 10. **Resume launches during restore/apply must be paced, not fired all at
     once.** `necro-restore.sh` and `necro-apply.sh` send a `claude`/`codex
     --resume` into every matching pane; doing this back-to-back for several
@@ -353,6 +371,7 @@ bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, n
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
 bash tests/necro-snapshot-active-zoom-field-test.sh  # records carry zoomed/pane_active/window_active (0 when tmux omits them)
+bash tests/necro-snapshot-fallback-min-epoch-test.sh  # latest-jsonl fallback rejects transcripts older than the pane
 bash tests/necro-snapshot-no-tty-guard-test.sh    # exit-capture refused without a real controlling tty
 bash tests/necro-snapshot-default-idle-only-test.sh  # bare invocation defaults to idle-only, no pane disruption
 bash tests/necro-snapshot-empty-answer-aborts-test.sh  # EOF on the exit prompt aborts (q), never falls through to exit-keys
