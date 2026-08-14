@@ -17,6 +17,16 @@ events to `~/.tmux-ai-necromancer-logs/tui.log`. These logs describe lifecycle,
 phase, action, skip, completion, and failure events; they do not record pane
 scrollback or agent transcripts.
 
+The watcher's `pin_uuid` event also records `source=argv|scrollback|cursor-pop`
+— which of the three resolvers produced the pinned id — and the `min_epoch`
+stamp that was in effect (the pane's first-seen time, which the cursor-pop
+fallback filters stale transcripts against). Without it, diagnosing a mispinned
+session means reconstructing resolver order from transcript mtimes by hand.
+
+Debug logging stays opt-in by design: there is no log rotation, so leaving it on
+costs the growth below indefinitely. Turn it on when investigating, off when
+done.
+
 Set `@necromancer_log_dir` or `NECROMANCER_LOG_DIR` to use a different log
 directory. `autosave.log` remains in the snapshot directory, which defaults to
 `~/.claude/tmux-snapshots` and can be overridden with
