@@ -1,0 +1,24 @@
+name: tui
+
+on:
+  push:
+    branches: [main]
+    paths: ['tui/**', '.github/workflows/tui.yml']
+  pull_request:
+    paths: ['tui/**', '.github/workflows/tui.yml']
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.21'
+          cache-dependency-path: tui/go.sum
+      - run: go build ./...
+      - run: go vet ./...
+      - run: go test ./...

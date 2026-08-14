@@ -65,6 +65,7 @@ aliases: [`docs/USAGE.md`](docs/USAGE.md).
 | Supported agents and transcript stores | [`docs/SUPPORTED_AGENTS.md`](docs/SUPPORTED_AGENTS.md) |
 | Adding a new agent adapter | [`docs/agents.md`](docs/agents.md) |
 | Debug logging | [`docs/DEBUG_LOGGING.md`](docs/DEBUG_LOGGING.md) |
+| CI workflows and running the checks locally | [`docs/CI.md`](docs/CI.md) |
 
 ## Troubleshooting
 
