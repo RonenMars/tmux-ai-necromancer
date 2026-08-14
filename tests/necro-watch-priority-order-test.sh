@@ -141,13 +141,36 @@ chmod +x "$TMPBIN/ps"
 
 export PATH="$TMPBIN:$PATH"
 
+# Debug logging on, so the pin_uuid event's source= field can be asserted too:
+# which tier produced the id must be recoverable from the log, not just the
+# resulting pin (issue #58).
+export NECROMANCER_DEBUG=on NECROMANCER_LOG_DIR="$TMP/logs"
+mkdir -p "$TMP/logs"
+WATCH_LOG="$TMP/logs/necro-watch.log"
+
 run_watch() {
   # Pre-seed first_seen to a time before the cursor-pop transcript's mtime so
   # the min_epoch filter (tested separately) doesn't reject a same-second
   # write purely on timing noise.
   printf '%%1|@necro_pane_first_seen=1\n' > "$STATE"
+  : > "$WATCH_LOG"
   bash "$ROOT/scripts/necro-watch.sh" >/dev/null 2>&1
   grep -F '%1|@necro_uuid=' "$STATE" | tail -1 | cut -d= -f2-
+}
+
+assert_source() {
+  local want="$1" line
+  line="$(grep -F 'action=pin_uuid' "$WATCH_LOG" | tail -1)"
+  case "$line" in
+    *"source=$want"*) ;;
+    *) echo "FAIL: expected pin_uuid source=$want, got '$line'" >&2; exit 1 ;;
+  esac
+  if [ "$want" = "cursor-pop" ]; then
+    case "$line" in
+      *min_epoch=1*) ;;
+      *) echo "FAIL: cursor-pop pin_uuid missing min_epoch, got '$line'" >&2; exit 1 ;;
+    esac
+  fi
 }
 
 # Case A: all three tiers available — argv must win.
@@ -157,7 +180,8 @@ got="$(run_watch)"
   echo "FAIL: all tiers available, expected argv UUID ($ARGV_UUID), got '$got'" >&2
   exit 1
 }
-echo "PASS: argv wins when all three tiers are available"
+assert_source argv
+echo "PASS: argv wins when all three tiers are available (logged source=argv)"
 
 # Case B: argv unavailable, scrollback + cursor-pop available — scrollback wins.
 unset NECRO_TEST_ARGV_HIT
@@ -167,7 +191,8 @@ got="$(run_watch)"
   echo "FAIL: argv unavailable, expected scrollback UUID ($SCROLLBACK_UUID), got '$got'" >&2
   exit 1
 }
-echo "PASS: scrollback wins when argv is unavailable"
+assert_source scrollback
+echo "PASS: scrollback wins when argv is unavailable (logged source=scrollback)"
 
 # Case C: only cursor-pop available — falls all the way through.
 unset NECRO_TEST_SCROLLBACK_HIT
@@ -176,4 +201,5 @@ got="$(run_watch)"
   echo "FAIL: only cursor-pop available, expected $CURSOR_UUID, got '$got'" >&2
   exit 1
 }
-echo "PASS: cursor-pop fallback used only when both higher tiers are unavailable"
+assert_source cursor-pop
+echo "PASS: cursor-pop fallback used only when both higher tiers are unavailable (logged source=cursor-pop, min_epoch)"

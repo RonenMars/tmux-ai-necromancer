@@ -146,10 +146,12 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
     # Ground truth first: read --resume <uuid> straight from the running
     # process argv. Scrollback and cursor-pop are both guesses; argv isn't.
     uuid="$(necro_agent_scrape_ps_resume "$agent" "$pane_id" 2>/dev/null || true)"
+    uuid_src="argv"
     # Fall back to scrollback (resurrect edge case: pane started with --resume
     # but the process already exited/respawned before this tick).
     if [ -z "$uuid" ]; then
       uuid="$(necro_agent_scrape_resume_cmd "$agent" "$pane_id" 2>/dev/null || true)"
+      uuid_src="scrollback"
     fi
     # First-seen stamp: closest proxy tmux offers for pane creation time.
     # Written before the cursor-pop fallback so that fallback can reject
@@ -163,9 +165,11 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
     # this pane, so a stale/unrelated session can't be handed out.
     if [ -z "$uuid" ]; then
       uuid="$(necro_agent_pop_session_id "$agent" "$cwd" "$first_seen" 2>/dev/null || true)"
+      uuid_src="cursor-pop"
     fi
     if [ -n "$uuid" ]; then
-      necro_log_event "watch" "pin_uuid" "pane=$pane_id" "agent=$agent"
+      necro_log_event "watch" "pin_uuid" "pane=$pane_id" "agent=$agent" \
+        "source=$uuid_src" "min_epoch=${first_seen:-}"
       tmux set-option -p -t "$pane_id" @necro_uuid  "$uuid"  2>/dev/null || true
       tmux set-option -p -t "$pane_id" @necro_cmd   "$cmd"   2>/dev/null || true
       tmux set-option -p -t "$pane_id" @necro_agent "$agent" 2>/dev/null || true
