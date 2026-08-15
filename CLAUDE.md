@@ -28,8 +28,11 @@ scripts/                   the executables (all source lib/*.sh)
   necro-doctor.sh          read-only health check (daemons, locks, pins, snapshot)
   necro-menu.sh            interactive menu: list/resume/cleanup snapshots, reboot prep, rate-limited save
   necro-log-divider.sh     stamp a labelled separator into every debug log
-  necro-clean-debug-logs.sh   remove debug logs (needs tmux)
-  necro-clean-debug-logs.py   same, standalone — no tmux/shell needed (Windows/Linux)
+  necro-clean-debug-logs.sh   remove debug logs (needs tmux); --older-than <dur>
+                              keeps recent ones, --scheduled is the daemon's
+                              per-tick gate on @necromancer_logs_scheduled_cleanup
+  necro-clean-debug-logs.py   same, standalone — no tmux/shell needed (Windows/Linux);
+                              --older-than too, but no --scheduled (no daemon there)
 lib/
   common.sh                PLUGIN_ROOT resolution, snapshot dir, logging, json escape
   agents.sh                adapter registry + dispatch
@@ -425,8 +428,9 @@ bash tests/necro-autosave-daemon-wiring-test.sh   # the TPM entrypoint actually 
 bash tests/necro-restore-keybind-test.sh          # restore binds prefix+ai via a key-table; single-key override still works
 bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the pinned reboot snapshot
 bash tests/necro-autosave-rotation-rate-limited-test.sh # rate-limited captures rotate too; the pin still exempts them
-bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots
+bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots; --older-than retention
 bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events
+bash tests/necro-clean-debug-logs-schedule-test.sh # --older-than retention; --scheduled duration/cron gating
 bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
 bash tests/necro-reboot-prep-skips-rate-limited-test.sh # the reboot target is never a rate-limited capture
 bash tests/necro-restore-claim-existing-test.sh   # restore claims unmarked resurrect-created panes

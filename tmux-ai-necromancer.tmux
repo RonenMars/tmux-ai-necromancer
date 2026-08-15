@@ -23,6 +23,12 @@
 # Read by the scripts themselves, not defaulted here (in-code fallbacks):
 #   @necromancer_resume_message       text sent into a pane after resume (default "continue")
 #   @necromancer_resume_message_delay seconds to wait before that message  (default 8)
+#   @necromancer_logs_scheduled_cleanup  how often the autosave daemon cleans debug
+#                                     logs: a duration (30m, 12h, 7d, 1d12h) or a
+#                                     five-field cron expression (0 3 * * *).
+#                                     Unset/off = never (default)
+#   @necromancer_logs_max_age         scheduled cleanup keeps logs younger than this
+#                                     duration; unset = remove them all (default)
 #   @necromancer_max_claude_transcript_bytes  resume size ceiling   (default 52428800)
 #   @necromancer_unsafe_cwd_patterns  globs restore refuses to rebuild (see --help)
 

@@ -62,6 +62,9 @@ necro_log_event "daemon" "start" "pid=$daemon_pid" "tick_seconds=$tick_seconds"
 
 while tmux list-sessions >/dev/null 2>&1; do
   "$SELF_DIR/necro-autosave.sh"
+  # Returns immediately unless @necromancer_logs_scheduled_cleanup is set and
+  # the schedule is due; piggybacking here avoids a third daemon and lock.
+  "$SELF_DIR/necro-clean-debug-logs.sh" --scheduled >/dev/null 2>&1 || true
   sleep "$tick_seconds"
 done
 
