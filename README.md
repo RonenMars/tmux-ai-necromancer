@@ -43,6 +43,10 @@ set -g @plugin 'RonenMars/tmux-ai-necromancer'
 That's it — the autosave daemon starts immediately. See
 [`docs/INSTALL.md`](docs/INSTALL.md) for manual install, dependencies, and WSL2.
 
+Every `set -g` line in these docs belongs in `~/.tmux.conf`. Run one at a shell
+prompt and it hits the shell's own `set` builtin instead — no error, no effect.
+From a shell, prefix it with `tmux`.
+
 ## Key bindings
 
 | Keys | Action |
@@ -70,8 +74,8 @@ aliases: [`docs/USAGE.md`](docs/USAGE.md).
 ## Troubleshooting
 
 See [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md) for common issues:
-sessions missing after reboot, the "inside tmux" guard, partial autosaves, and
-idempotency behavior.
+sessions missing after reboot, the "inside tmux" guard, partial autosaves,
+idempotency behavior, and options that appear set but have no effect.
 
 ## License
 

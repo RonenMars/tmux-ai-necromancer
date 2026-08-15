@@ -4,7 +4,15 @@
 `set -g @plugin` line from [Install](INSTALL.md#with-tpm-recommended) is enough on its own.
 The values below are the defaults; pasting the block verbatim changes nothing.
 Override only what you want to change, in `~/.tmux.conf` **before** the line that
-loads TPM:
+loads TPM.
+
+These lines belong in `~/.tmux.conf`, not in a shell. Pasted at a shell prompt
+they hit bash's or zsh's own `set` builtin, which accepts them, does nothing
+useful, and prints no error — the option stays unset with no sign of it. To set
+one from a shell, prefix the command with `tmux` (`tmux set -g @necromancer_interval '5'`);
+that applies to the running server only, so put it in `~/.tmux.conf` as well if
+you want it to survive a restart. See
+[Troubleshooting → A `@necromancer_*` option has no effect](TROUBLESHOOTING.md#a-necromancer_-option-has-no-effect).
 
 ```tmux
 set -g @necromancer_interval         '5'             # minutes between autosaves
