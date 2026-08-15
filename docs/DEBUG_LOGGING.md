@@ -133,6 +133,10 @@ set -g @necromancer_logs_scheduled_cleanup '*/30 * * * *'
 set -g @necromancer_logs_max_age '3d'   # keep the last 3 days on each run
 ```
 
+Those `set -g` lines go in `~/.tmux.conf`. At a shell prompt they silently reach
+the shell's own `set` builtin instead, so prefix them with `tmux` there — see
+[Troubleshooting → A `@necromancer_*` option has no effect](TROUBLESHOOTING.md#a-necromancer_-option-has-no-effect).
+
 `@necromancer_logs_max_age` is the `--older-than` value scheduled runs use; leave
 it unset and a scheduled run removes every log. The environment variables
 `NECROMANCER_LOGS_SCHEDULED_CLEANUP` and `NECROMANCER_LOGS_MAX_AGE` override both

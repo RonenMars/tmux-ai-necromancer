@@ -252,6 +252,46 @@ rather than `codex` — so the adapter matches `codex-*` as well as `codex`. If
 your pane shows some other command name entirely, see
 [`docs/agents.md`](agents.md).
 
+## A `@necromancer_*` option has no effect
+
+First check where you typed it. Every option snippet in these docs is written
+for `~/.tmux.conf`:
+
+```tmux
+set -g @necromancer_logs_scheduled_cleanup '7d'
+```
+
+Pasted at a **shell** prompt, that line does not reach tmux at all. `set` is
+also a shell builtin, so bash and zsh happily accept it, set a shell option
+nobody reads, and print nothing. There is no error to notice — the option
+simply stays unset. At a shell prompt the command needs the `tmux` prefix:
+
+```bash
+tmux set -g @necromancer_logs_scheduled_cleanup '7d'
+```
+
+Confirm what the server actually holds:
+
+```bash
+tmux show-options -gv @necromancer_logs_scheduled_cleanup
+```
+
+`invalid option: …` means it was never set. `scripts/necro-doctor.sh` prints
+the effective configuration under **Effective configuration**, which is the
+faster way to check several at once.
+
+Note the two forms differ in lifetime as well as in reaching tmux at all:
+`tmux set -g` changes the running server only and is lost when the server
+exits, while a line in `~/.tmux.conf` is re-applied on every server start.
+Setting it both ways is the normal end state.
+
+If the option *is* set and still has no effect, see
+[Applying a config change later](CONFIGURATION.md#applying-a-config-change-later)
+— most options are read on each script run, but the daemons read their tick
+once at startup and need a restart.
+
+---
+
 ## Debug logs
 
 - Enable tracing with `set -g @necromancer_debug 'on'` (or
@@ -264,7 +304,12 @@ your pane shows some other command name entirely, see
   to `tui.log`, including its load, review, exit, tmux, and snapshot phases.
   Neither logger records scrollback or transcript content.
 - Run `scripts/necro-clean-debug-logs.sh --dry-run` to preview cleanup, then
-  rerun without the flag to remove the debug logs.
+  rerun without the flag to remove the debug logs. Add `--older-than 7d` to
+  keep the last week instead of removing everything.
+- Nothing rotates these files, so leaving debug mode on costs roughly 20 MB a
+  day. `@necromancer_logs_scheduled_cleanup` makes the autosave daemon clean
+  them on a duration or cron schedule — see
+  [Debug logging → Scheduled cleanup](DEBUG_LOGGING.md#scheduled-cleanup).
 
 ---
 
