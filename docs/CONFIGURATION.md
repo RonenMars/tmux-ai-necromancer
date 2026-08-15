@@ -23,7 +23,14 @@ set -g @necromancer_resume_delay        '5'  # seconds to pause between resume b
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
 set -g @necromancer_resume_message_delay '8'  # seconds to wait before sending that message
+set -g @necromancer_logs_scheduled_cleanup ''  # how often to clean debug logs: a duration (30m, 12h, 7d, 1d12h) or cron ('0 3 * * *'); empty/off = never
+set -g @necromancer_logs_max_age           ''  # scheduled cleanup keeps logs younger than this duration; empty = remove them all
 ```
+
+The two `logs_` options are the only ones that delete anything on a timer, and
+both default to empty, so nothing is cleaned until you configure them. See
+[Debug logging → Scheduled cleanup](DEBUG_LOGGING.md#scheduled-cleanup) for the
+supported cron subset and the one-off `--older-than` flag.
 
 Two more options govern restore safety —
 `@necromancer_max_claude_transcript_bytes` and `@necromancer_unsafe_cwd_patterns`.
