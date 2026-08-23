@@ -31,6 +31,7 @@ set -g @necromancer_resume_delay        '5'  # seconds to pause between resume b
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
 set -g @necromancer_resume_message_delay '8'  # seconds to wait before sending that message
+set -g @necromancer_resume_start_delay   '1'  # seconds to wait after creating a fresh pane before the resume command itself
 set -g @necromancer_logs_scheduled_cleanup ''  # how often to clean debug logs: a duration (30m, 12h, 7d, 1d12h) or cron ('0 3 * * *'); empty/off = never
 set -g @necromancer_logs_max_age           ''  # scheduled cleanup keeps logs younger than this duration; empty = remove them all
 ```
@@ -82,6 +83,16 @@ ended by asking *you* a question, an auto-sent `continue` answers it blindly —
 disable the message when that matters. Also configurable via `--resume-message` /
 `--resume-message-delay` and `NECROMANCER_RESUME_MESSAGE` /
 `NECROMANCER_RESUME_MESSAGE_DELAY`.
+
+`necro-restore.sh` also waits `@necromancer_resume_start_delay` seconds
+(default 1) after creating a fresh pane before sending the resume command
+itself — the pane's shell (zsh init, plugin managers, etc.) isn't necessarily
+ready for input the instant the pane exists, and keystrokes sent too early are
+dropped rather than queued, leaving the pane empty with the agent never
+resumed. Raise it on a slow shell via `--resume-start-delay N` or
+`NECROMANCER_RESUME_START_DELAY`. `necro-apply.sh` doesn't need this option —
+it resumes into panes that were already live before the script ran, not
+freshly-spawned ones.
 
 Rate-limit auto-save: the watcher scans for Claude "session limit" / Codex
 "usage limit" banners at most once per `@necromancer_limit_check_interval`

@@ -126,11 +126,36 @@ if server_up; then
 elif (( DRY_RUN )); then
   necro_say "DRY-RUN: would start server / trigger continuum restore"
 else
-  tmux start-server
+  # `tmux start-server` alone doesn't persist: with zero sessions, tmux's
+  # default `exit-empty on` tears the server right back down, so `server_up`
+  # never turns true — every headless run fell through to the resurrect
+  # branch below, which then looped "no server running" for the full 10s.
+  # Seed a throwaway session so the server has something to keep it alive;
+  # Phase 2 (necro-restore.sh) adds the real sessions on top, and this one
+  # gets cleaned up below once at least one other exists.
+  tmux new-session -d -s _necro_boot_ 2>/dev/null
   for _ in $(seq 1 20); do sleep 0.5; server_up && break; done
-  if ! server_up && [ -x "$RESURRECT_RESTORE" ]; then
-    necro_warn "Continuum didn't auto-restore — running resurrect restore."
-    "$RESURRECT_RESTORE" >/dev/null || true
+  if [ -x "$RESURRECT_RESTORE" ]; then
+    necro_warn "Running resurrect restore for anything continuum didn't cover."
+    # tmux-resurrect's restore.sh resolves its own socket via
+    # `tmux_socket() { echo $TMUX | cut -d',' -f1; }` — it reads the *env
+    # var*, it never asks tmux directly. We're headless (this script must
+    # run outside tmux, so $TMUX is unset), so every `-S "$(tmux_socket)"`
+    # call in restore.sh gets an empty socket path and fails with
+    # "error creating  (No such file or directory)", which then cascades
+    # into "[: -ne: unary operator expected" when it tries to read the
+    # (never created) session's base-index — repeating once per window in
+    # the saved layout. Synthesize a valid $TMUX pointing at the server we
+    # just started, on its default socket.
+    boot_socket="$(tmux display-message -p '#{socket_path}' 2>/dev/null || true)"
+    if [ -n "$boot_socket" ]; then
+      TMUX="${boot_socket},,0" "$RESURRECT_RESTORE" >/dev/null || true
+    else
+      necro_warn "Could not resolve tmux socket path — skipping resurrect restore."
+    fi
+  fi
+  if server_up && [ "$(tmux list-sessions 2>/dev/null | wc -l | tr -d ' ')" -gt 1 ]; then
+    tmux kill-session -t _necro_boot_ 2>/dev/null || true
   fi
   necro_ok "Server up ($(tmux list-sessions 2>/dev/null | wc -l | tr -d ' ') session(s))."
 fi

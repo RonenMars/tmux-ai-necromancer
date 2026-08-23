@@ -119,6 +119,63 @@ pinned reboot snapshot and bring tmux back up first.
 
 ---
 
+## `necro-resume` loops "no server running" / "unary operator expected"
+
+**Symptom:** Right after a fresh reboot, `necro-resume` repeats
+`no server running on /private/tmp/tmux-<uid>/default`, `error creating  (No
+such file or directory)`, and
+`.../tmux-resurrect/scripts/restore.sh: line ...: [: -ne: unary operator
+expected` — once per window in the last resurrect save — and never actually
+creates a session.
+
+**Cause:** Two compounding bugs in Phase 1 (`necro-reboot-resume.sh`, "ensure
+tmux server is up"):
+
+1. `tmux start-server` alone doesn't persist a server with zero sessions —
+   tmux's default `exit-empty on` tears it right back down, so the "is the
+   server up yet" poll never succeeds and falls through to the resurrect
+   fallback below on every headless run.
+2. tmux-resurrect's `restore.sh` resolves its own socket via
+   `tmux_socket() { echo $TMUX | cut -d',' -f1; }` — it reads the *env var*,
+   never asks tmux directly. `necro-resume` must run outside tmux (see above),
+   so `$TMUX` is unset there, and every `-S "$(tmux_socket)"` call in
+   `restore.sh` gets an empty socket path.
+
+**Fix:** Update to a version with the Phase 1 patch — it seeds a throwaway
+placeholder session (so the server actually stays up) and synthesizes a valid
+`$TMUX` for the resurrect fallback from the server's real socket path. If
+you're stuck on an old checkout, work around it manually: `Ctrl-C` the stuck
+`necro-resume`, then run `necro-restore.sh` directly (see the section above) —
+it creates sessions with plain `tmux new-session`, which doesn't depend on
+`$TMUX` at all.
+
+---
+
+## Resumed pane sits empty — agent never actually resumed
+
+**Symptom:** `necro-restore.sh` reports `agents resumed: N`, but a pane it
+just created is empty — no `claude`/`codex` prompt, just an idle shell.
+
+**Cause:** A pane just created by `new-window`/`split-window`/`new-session`
+isn't immediately ready for input — its shell is still starting (zsh init,
+plugin managers, etc.) — and `tmux send-keys` sent too early is dropped
+entirely, not queued.
+
+**Fix:** `necro-restore.sh` now waits `@necromancer_resume_start_delay`
+(default 1s) after creating a fresh pane before sending the resume command.
+If it's still happening on a slow shell, raise it:
+
+```bash
+necro-restore.sh --resume-start-delay 3 <snapshot>
+# or: export NECROMANCER_RESUME_START_DELAY=3
+```
+
+If you already hit this on a stuck resume, just retry it by hand — safe to
+`tmux send-keys -t <pane> 'claude --resume <uuid>' Enter` (or the `codex`
+equivalent) once the pane's prompt is actually up.
+
+---
+
 ## Autosave shows only 3 records when many sessions are open
 
 **Symptom:** `autosave.log` summary line shows `total=3` but you have 15+
