@@ -22,6 +22,7 @@ set -g @necromancer_restore_key      'ai'            # prefix chord for restore 
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
+set -g @necromancer_debug_log_max_bytes '20971520'  # 20 MiB — cap per debug log file before it rotates to .old (0 disables)
 set -g @necromancer_autosave_tick   '60'            # autosave daemon polling interval in seconds
 set -g @necromancer_watch_tick      '1'             # watcher daemon polling interval in seconds
 set -g @necromancer_limit_check_interval '60'       # seconds between rate-limit auto-saves (0 disables; or NECROMANCER_LIMIT_CHECK_INTERVAL)
@@ -124,9 +125,13 @@ Set `@necromancer_debug` to `on` while investigating a problem. Each script
 then writes structured lifecycle and action events to
 `~/.tmux-ai-necromancer-logs/<script>.log`. Override the log location with
 `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`; set
-`NECROMANCER_DEBUG=1` to enable it for one command. See the
+`NECROMANCER_DEBUG=1` to enable it for one command. Each log file is capped at
+`@necromancer_debug_log_max_bytes` (default 20 MiB — `0` disables rotation)
+so it can't grow unbounded even with no scheduled cleanup configured;
+override with `NECROMANCER_DEBUG_LOG_MAX_BYTES`. See the
 [debug logging guide](DEBUG_LOGGING.md) for cleanup, cross-platform use,
-and expected disk usage.
+and expected disk usage — the growth estimate there scales worse than
+linearly with pane count, so don't extrapolate it past a handful of panes.
 
 The shell logs also include lifecycle records in the form
 `event phase=<phase> action=<action>`, covering run startup, phases, records,

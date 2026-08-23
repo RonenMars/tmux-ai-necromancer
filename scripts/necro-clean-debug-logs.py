@@ -71,6 +71,7 @@ def log_files(
     files: list[Path] = []
     if log_dir.is_dir():
         files.extend(sorted(path for path in log_dir.glob("*.log") if path.is_file()))
+        files.extend(sorted(path for path in log_dir.glob("*.log.old") if path.is_file()))
 
     autosave_log = snapshot_dir / "autosave.log"
     if autosave_log.is_file():

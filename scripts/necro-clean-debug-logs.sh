@@ -198,7 +198,7 @@ cutoff=0
 
 count=0
 kept=0
-for file in "$LOG_DIR"/*.log "$SNAP_DIR/autosave.log"; do
+for file in "$LOG_DIR"/*.log "$LOG_DIR"/*.log.old "$SNAP_DIR/autosave.log"; do
   [ -f "$file" ] || continue
   if [ -n "$max_age_seconds" ]; then
     mtime="$(necro_file_mtime "$file")"

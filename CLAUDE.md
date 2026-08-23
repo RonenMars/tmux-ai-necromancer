@@ -431,6 +431,7 @@ bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the p
 bash tests/necro-autosave-rotation-rate-limited-test.sh # rate-limited captures rotate too; the pin still exempts them
 bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots; --older-than retention
 bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events
+bash tests/necro-debug-log-rotation-test.sh       # an oversized debug log rotates to .log.old instead of growing unbounded
 bash tests/necro-clean-debug-logs-schedule-test.sh # --older-than retention; --scheduled duration/cron gating
 bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
 bash tests/necro-reboot-resume-headless-restore-test.sh  # Phase 1 persists a real server headless and hands resurrect restore.sh a valid $TMUX
