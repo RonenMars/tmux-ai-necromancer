@@ -23,6 +23,10 @@
 # Read by the scripts themselves, not defaulted here (in-code fallbacks):
 #   @necromancer_resume_message       text sent into a pane after resume (default "continue")
 #   @necromancer_resume_message_delay seconds to wait before that message  (default 8)
+#   @necromancer_resume_start_delay   seconds to wait after creating a fresh pane before
+#                                      the resume command itself (default 1)
+#   @necromancer_debug_log_max_bytes  bytes before a debug log rotates to .log.old
+#                                      (default 20971520 = 20 MiB; 0 disables)
 #   @necromancer_logs_scheduled_cleanup  how often the autosave daemon cleans debug
 #                                     logs: a duration (30m, 12h, 7d, 1d12h) or a
 #                                     five-field cron expression (0 3 * * *).

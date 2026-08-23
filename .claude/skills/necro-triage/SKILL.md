@@ -119,7 +119,10 @@ scripts/necro-clean-debug-logs.sh
 tmux set-option -g @necromancer_debug off
 ```
 
-It costs ~13 MB/day and nothing prunes it automatically.
+It costs ~6-7 MB/day at 10 panes, but scales worse than linearly with pane
+count (measured ~6 GB/day at 27 panes) — see [docs/DEBUG_LOGGING.md](../../../docs/DEBUG_LOGGING.md#approximate-daily-growth).
+Each log file auto-rotates to `.log.old` at 20 MiB by default, but nothing
+prunes old generations automatically unless scheduled cleanup is configured.
 
 ## Reference
 

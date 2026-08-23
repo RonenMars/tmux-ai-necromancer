@@ -206,6 +206,40 @@ necro_log_event() {
   printf '\n' >&3
 }
 
+# Byte cap on a single debug log file before it's rotated. Checked once per
+# necro_init_log call (once per script invocation — for necro-watch.sh that's
+# once per daemon tick, matching invariant 15's O(1)-per-tick rule), never
+# per-event: a stat() on every necro_log_event call would itself scale with
+# pane count on the hot path this whole cap exists to bound.
+necro_debug_log_max_bytes() {
+  local val
+  if [ -n "${NECROMANCER_DEBUG_LOG_MAX_BYTES:-}" ]; then
+    val="$NECROMANCER_DEBUG_LOG_MAX_BYTES"
+  else
+    val="$(necro_tmux_option @necromancer_debug_log_max_bytes "20971520")"  # 20 MiB
+  fi
+  case "$val" in
+    ''|*[!0-9]*) printf '20971520' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
+# Rotate a debug log to `.old` (overwriting any previous `.old`) once it
+# crosses the byte cap, so a script left running with @necromancer_debug=on
+# can't grow one log file without bound. Not a numbered rotation scheme —
+# one `.old` generation is enough to bound total size to ~2x the cap while
+# still leaving recent history on disk for necro-triage.
+necro_rotate_debug_log_if_large() {
+  local file="$1" max_bytes size
+  max_bytes="$(necro_debug_log_max_bytes)"
+  [ "$max_bytes" -gt 0 ] || return 0
+  [ -f "$file" ] || return 0
+  size="$(wc -c < "$file" 2>/dev/null | tr -d ' ')"
+  case "$size" in ''|*[!0-9]*) return 0 ;; esac
+  [ "$size" -gt "$max_bytes" ] || return 0
+  mv -f "$file" "$file.old" 2>/dev/null || true
+}
+
 # Initialize opt-in per-script structured logging. Stdout and stderr remain
 # untouched; callers emit lifecycle and action events via necro_log_event.
 necro_init_log() {
@@ -222,6 +256,7 @@ necro_init_log() {
   }
   NECRO_LOG_FILE="$log_dir/$name.log"
   export NECRO_LOG_FILE
+  necro_rotate_debug_log_if_large "$NECRO_LOG_FILE"
   exec 3>> "$NECRO_LOG_FILE"
   necro_log_event "run" "start" "script=$name"
 }

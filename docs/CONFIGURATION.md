@@ -22,6 +22,7 @@ set -g @necromancer_restore_key      'ai'            # prefix chord for restore 
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
 set -g @necromancer_debug           'off'           # write per-command debug logs
+set -g @necromancer_debug_log_max_bytes '20971520'  # 20 MiB — cap per debug log file before it rotates to .old (0 disables)
 set -g @necromancer_autosave_tick   '60'            # autosave daemon polling interval in seconds
 set -g @necromancer_watch_tick      '1'             # watcher daemon polling interval in seconds
 set -g @necromancer_limit_check_interval '60'       # seconds between rate-limit auto-saves (0 disables; or NECROMANCER_LIMIT_CHECK_INTERVAL)
@@ -31,6 +32,7 @@ set -g @necromancer_resume_delay        '5'  # seconds to pause between resume b
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
 set -g @necromancer_resume_message_delay '8'  # seconds to wait before sending that message
+set -g @necromancer_resume_start_delay   '1'  # seconds to wait after creating a fresh pane before the resume command itself
 set -g @necromancer_logs_scheduled_cleanup ''  # how often to clean debug logs: a duration (30m, 12h, 7d, 1d12h) or cron ('0 3 * * *'); empty/off = never
 set -g @necromancer_logs_max_age           ''  # scheduled cleanup keeps logs younger than this duration; empty = remove them all
 ```
@@ -83,6 +85,16 @@ disable the message when that matters. Also configurable via `--resume-message` 
 `--resume-message-delay` and `NECROMANCER_RESUME_MESSAGE` /
 `NECROMANCER_RESUME_MESSAGE_DELAY`.
 
+`necro-restore.sh` also waits `@necromancer_resume_start_delay` seconds
+(default 1) after creating a fresh pane before sending the resume command
+itself — the pane's shell (zsh init, plugin managers, etc.) isn't necessarily
+ready for input the instant the pane exists, and keystrokes sent too early are
+dropped rather than queued, leaving the pane empty with the agent never
+resumed. Raise it on a slow shell via `--resume-start-delay N` or
+`NECROMANCER_RESUME_START_DELAY`. `necro-apply.sh` doesn't need this option —
+it resumes into panes that were already live before the script ran, not
+freshly-spawned ones.
+
 Rate-limit auto-save: the watcher scans for Claude "session limit" / Codex
 "usage limit" banners at most once per `@necromancer_limit_check_interval`
 seconds (default 60; set to `0` or `NECROMANCER_LIMIT_CHECK_INTERVAL=0` to
@@ -113,9 +125,13 @@ Set `@necromancer_debug` to `on` while investigating a problem. Each script
 then writes structured lifecycle and action events to
 `~/.tmux-ai-necromancer-logs/<script>.log`. Override the log location with
 `@necromancer_log_dir` or `NECROMANCER_LOG_DIR`; set
-`NECROMANCER_DEBUG=1` to enable it for one command. See the
+`NECROMANCER_DEBUG=1` to enable it for one command. Each log file is capped at
+`@necromancer_debug_log_max_bytes` (default 20 MiB — `0` disables rotation)
+so it can't grow unbounded even with no scheduled cleanup configured;
+override with `NECROMANCER_DEBUG_LOG_MAX_BYTES`. See the
 [debug logging guide](DEBUG_LOGGING.md) for cleanup, cross-platform use,
-and expected disk usage.
+and expected disk usage — the growth estimate there scales worse than
+linearly with pane count, so don't extrapolate it past a handful of panes.
 
 The shell logs also include lifecycle records in the form
 `event phase=<phase> action=<action>`, covering run startup, phases, records,

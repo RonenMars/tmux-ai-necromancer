@@ -401,6 +401,7 @@ bash tests/necro-restore-only-layout-test.sh      # a partially-restored window 
 bash tests/necro-restore-menu-no-tty-test.sh      # --menu refuses without a real tty, and changes nothing
 bash tests/necro-menu-select-records-test.sh      # menu [2] '[s]elect records' really reaches the picker
 bash tests/necro-restore-resume-delay-test.sh     # resume launches are paced, not fired all at once
+bash tests/necro-restore-resume-start-delay-test.sh  # restore waits for a fresh pane's shell before sending the resume command
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
 bash tests/necro-snapshot-active-zoom-field-test.sh  # records carry zoomed/pane_active/window_active (0 when tmux omits them)
@@ -430,8 +431,10 @@ bash tests/necro-autosave-rotation-pin-test.sh    # rotation never deletes the p
 bash tests/necro-autosave-rotation-rate-limited-test.sh # rate-limited captures rotate too; the pin still exempts them
 bash tests/necro-clean-debug-logs-python-test.sh  # python cleaner removes logs only, never snapshots; --older-than retention
 bash tests/necro-debug-logging-test.sh            # debug logging is opt-in and writes structured events
+bash tests/necro-debug-log-rotation-test.sh       # an oversized debug log rotates to .log.old instead of growing unbounded
 bash tests/necro-clean-debug-logs-schedule-test.sh # --older-than retention; --scheduled duration/cron gating
 bash tests/necro-reboot-resume-cleanup-test.sh    # reboot-resume idle-window cleanup keeps busy windows
+bash tests/necro-reboot-resume-headless-restore-test.sh  # Phase 1 persists a real server headless and hands resurrect restore.sh a valid $TMUX
 bash tests/necro-reboot-prep-skips-rate-limited-test.sh # the reboot target is never a rate-limited capture
 bash tests/necro-restore-claim-existing-test.sh   # restore claims unmarked resurrect-created panes
 bash tests/necro-restore-multipane-window-test.sh # multi-pane windows restore as splits, not flat windows

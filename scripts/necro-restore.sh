@@ -41,6 +41,7 @@ RESUME_BATCH_SIZE_OPT=""
 RESUME_MESSAGE_OPT_SET=0
 RESUME_MESSAGE_OPT=""
 RESUME_MESSAGE_DELAY_OPT=""
+RESUME_START_DELAY_OPT=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -53,6 +54,7 @@ while [ $# -gt 0 ]; do
     --resume-batch-size) RESUME_BATCH_SIZE_OPT="${2:-}"; shift 2 ;;
     --resume-message) RESUME_MESSAGE_OPT_SET=1; RESUME_MESSAGE_OPT="${2:-}"; shift 2 ;;
     --resume-message-delay) RESUME_MESSAGE_DELAY_OPT="${2:-}"; shift 2 ;;
+    --resume-start-delay) RESUME_START_DELAY_OPT="${2:-}"; shift 2 ;;
     -h|--help)
       cat <<'H'
 necro-restore.sh — recreate AI-agent tmux sessions from a snapshot.
@@ -69,6 +71,7 @@ Usage:
   necro-restore.sh --resume-batch-size N   resumes per batch before pausing (default 1)
   necro-restore.sh --resume-message STR    text sent to each pane after resume (default 'continue', '' disables)
   necro-restore.sh --resume-message-delay N  seconds to wait before that message (default 8)
+  necro-restore.sh --resume-start-delay N  seconds to wait after creating a pane before the resume command (default 1)
 
 Selectors (--only):
   Comma-separated. Each dispatches on its shape, and the three forms are
@@ -102,6 +105,14 @@ Config:
       Seconds to wait after resuming before sending that message, so it lands
       at the prompt not the boot screen (default 8). --resume-message-delay
       overrides both.
+  NECROMANCER_RESUME_START_DELAY or @necromancer_resume_start_delay
+      Seconds to wait after creating a fresh pane before sending the resume
+      command itself (default 1). A pane spawned by new-window/split-window/
+      new-session isn't immediately ready for input — its shell (zsh init,
+      plugin managers, etc.) is still starting — and keystrokes sent too
+      early are silently dropped rather than queued. Raise this if resumes
+      land in an empty pane on a slow shell. --resume-start-delay overrides
+      both.
 
 Idempotent: reuses existing sessions/windows; resumes only into fresh panes.
 H
@@ -337,6 +348,21 @@ resume_message_delay() {
   esac
 }
 
+resume_start_delay() {
+  local val
+  if [ -n "$RESUME_START_DELAY_OPT" ]; then
+    val="$RESUME_START_DELAY_OPT"
+  elif [ -n "${NECROMANCER_RESUME_START_DELAY:-}" ]; then
+    val="$NECROMANCER_RESUME_START_DELAY"
+  else
+    val="$(necro_tmux_option @necromancer_resume_start_delay "1")"
+  fi
+  case "$val" in
+    ''|*[!0-9.]*) printf '1' ;;
+    *) printf '%s' "$val" ;;
+  esac
+}
+
 unsafe_cwd_patterns() {
   local val
   if [ "${NECROMANCER_UNSAFE_CWD_PATTERNS+x}" = "x" ]; then
@@ -400,6 +426,7 @@ resume_batch="$(resume_batch_size)"
 resume_batch_count=0
 resume_message="$(resume_message)"
 resume_message_delay="$(resume_message_delay)"
+resume_start_delay="$(resume_start_delay)"
 
 necro_hr
 necro_say "Necromancer restore"
@@ -408,6 +435,7 @@ echo "  Records:  $total_records"
 echo "  Dry-run:  $DRY_RUN"
 echo "  Max Claude transcript: $(format_bytes "$max_claude_bytes") ($max_claude_bytes bytes)"
 echo "  Resume pacing: ${resume_delay}s pause every ${resume_batch} resume(s)"
+echo "  Pane readiness wait before resume: ${resume_start_delay}s"
 if [ -n "$resume_message" ]; then
   echo "  Post-resume message: '$resume_message' after ${resume_message_delay}s"
 else
@@ -688,6 +716,11 @@ while IFS= read -r line; do
     resume_cmd="$(necro_agent_resume_cmd "$agent" "$uuid")"
     if [ -n "$resume_cmd" ]; then
       echo "  resume: $resume_cmd"
+      # A pane just created by new-window/split-window/new-session isn't
+      # immediately ready for input — its shell is still starting — and
+      # keystrokes sent too early are dropped, not queued, leaving the pane
+      # empty with the agent never resumed. Give it a beat first.
+      [ "$DRY_RUN" = "0" ] && sleep "$resume_start_delay"
       run tmux send-keys -t "$target" "$resume_cmd" Enter
       # Nudge the freshly-resumed agent to pick up its task. Wait first so the
       # message lands at the prompt, not on the agent's boot screen.

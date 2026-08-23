@@ -7,6 +7,9 @@ tui/bin/
 # OS
 .DS_Store
 
+# Python (necro-clean-debug-logs.py)
+__pycache__/
+
 # Local snapshots (never commit user session data)
 *.jsonl
 tmux-snapshots/

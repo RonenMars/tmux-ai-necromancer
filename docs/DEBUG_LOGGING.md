@@ -23,10 +23,12 @@ stamp that was in effect (the pane's first-seen time, which the cursor-pop
 fallback filters stale transcripts against). Without it, diagnosing a mispinned
 session means reconstructing resolver order from transcript mtimes by hand.
 
-Debug logging stays opt-in by design: nothing rotates the files, so leaving it
-on costs the growth below indefinitely unless you configure the
-[scheduled cleanup](#scheduled-cleanup). Turn it on when investigating, off when
-done.
+Debug logging stays opt-in by design. Each log file is capped at
+`@necromancer_debug_log_max_bytes` (default 20 MiB — see
+[Automatic rotation](#automatic-rotation) below) so a forgotten `on` can't grow
+one file without bound, but nothing deletes old generations on its own unless
+you configure the [scheduled cleanup](#scheduled-cleanup). Turn debug mode on
+when investigating, off when done.
 
 Set `@necromancer_log_dir` or `NECROMANCER_LOG_DIR` to use a different log
 directory. `autosave.log` remains in the snapshot directory, which defaults to
@@ -35,21 +37,44 @@ directory. `autosave.log` remains in the snapshot directory, which defaults to
 
 ## Approximate daily growth
 
-The estimate below assumes a 1-second watcher tick, a 5-minute autosave
-interval, and debug mode enabled. It excludes the TUI, whose usage
+The table below assumes a 1-second watcher tick, a 5-minute autosave interval,
+debug mode enabled, and **10 agent panes**. It excludes the TUI, whose usage
 depends on how actively it is used.
 
-| Log source | Approximate daily growth | What drives it |
+| Log source | Approximate daily growth (10 panes) | What drives it |
 | --- | ---: | --- |
 | Pane watcher | ~3.5 MB | One structured pass per watcher tick |
 | Autosave | ~2.5–3 MB | Snapshot eligibility and save events every 5 minutes |
 | Snapshot and autosave summary | ~0.3 MB | Snapshot completion and summary records |
 | **Total, without TUI** | **~6–7 MB/day** | Typical active tmux usage |
 
-At that rate, leaving debug mode on without cleanup would use roughly
-250–300 MB per month. The logs use disk space and a small amount of additional
-file I/O only; they do not change snapshot contents, stop panes, or inspect
-agent transcripts.
+**This does not scale linearly with pane count — it scales worse.** The
+watcher's per-tick cost grows with pane count (invariant 15 keeps it O(1) in
+*tmux calls*, not in log bytes written per pane), and each additional pane
+adds its own scrape/pin events every tick. Measured on a real server at 27
+panes: `necro-watch.log` alone reached **158 MB in 38 minutes** — roughly
+**6 GB/day**, about 285× the 10-pane total above. Don't extrapolate the table
+linearly past a handful of panes; if you're running a large fleet of agent
+panes with debug on, watch the actual file size (`ls -lh
+~/.tmux-ai-necromancer-logs/`) rather than trusting this estimate.
+
+## Automatic rotation
+
+Regardless of pane count, each individual log file is capped at
+`@necromancer_debug_log_max_bytes` bytes (default 20 MiB, checked once per
+script invocation — once per watcher tick for `necro-watch.log`). Crossing the
+cap renames the file to `<name>.log.old`, overwriting any previous `.old`, and
+starts a fresh one — so a single log name never grows past roughly 2x the cap
+even if you leave debug mode on and never configure scheduled cleanup.
+`.old` files are ordinary files: `necro-clean-debug-logs.sh` /
+`necro-clean-debug-logs.py` sweep them the same as the active log, and
+[scheduled cleanup](#scheduled-cleanup) removes them by age too. Override the
+cap with `NECROMANCER_DEBUG_LOG_MAX_BYTES` or
+`@necromancer_debug_log_max_bytes`; `0` disables rotation entirely.
+
+This bounds worst-case disk usage; it does not replace the growth estimate
+above for planning how much history you'll actually have on disk at any given
+moment — a busier watcher rotates more often and keeps less total history.
 
 ## Marking a repro
 
