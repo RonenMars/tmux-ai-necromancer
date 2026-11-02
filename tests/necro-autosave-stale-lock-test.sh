@@ -131,6 +131,10 @@ else
   echo "FAIL: a dead owner still wedges autosave"
   fail=1
 fi
+# Let the finished run drop its own lock first: its release_lock rmdirs
+# $LOCK, and landing after the next case's mkdir it would delete that fresh
+# lock and make a "young lock" look absent (the flake this guards).
+await_unlocked
 rm -rf "$LOCK"
 
 # ── 4. A wrapper merely MENTIONING the script is not an owner ───────────────
@@ -151,6 +155,10 @@ else
   fail=1
 fi
 kill "$decoy_pid" 2>/dev/null; wait "$decoy_pid" 2>/dev/null
+# Let the finished run drop its own lock first: its release_lock rmdirs
+# $LOCK, and landing after the next case's mkdir it would delete that fresh
+# lock and make a "young lock" look absent (the flake this guards).
+await_unlocked
 rm -rf "$LOCK"
 
 # ── 5. A YOUNG lock with no pid yet is respected ────────────────────────────
