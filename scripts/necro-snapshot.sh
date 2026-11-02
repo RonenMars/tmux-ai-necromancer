@@ -210,7 +210,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
   printf '\n[%d/%d] %s  %s:%s  %s  (cmd=%s)\n' \
     "$i" "$total" "$pane_id" "$session" "$win_idx" "$win_name" "$cmd"
 
-  agent="$(necro_agent_for_cmd "$cmd")"
+  agent="$(necro_agent_for_cmd "$cmd" "$pane_id")"
 
   # --rate-limited: only live agent panes whose scrollback shows a limit
   # banner. Idle shells / non-agents are skipped (a limited Claude/Codex is

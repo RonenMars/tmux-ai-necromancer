@@ -9,9 +9,9 @@
 #
 # Requires lib/common.sh to be sourced first (for LIB_DIR + necro_tmux_option).
 
-# Which agents are enabled. Override with `set -g @necromancer_agents "claude codex"`.
+# Which agents are enabled. Override with `set -g @necromancer_agents "claude codex cursor"`.
 necro_enabled_agents() {
-  necro_tmux_option @necromancer_agents "claude codex"
+  necro_tmux_option @necromancer_agents "claude codex cursor"
 }
 
 # Source all adapter files for the enabled agents. Idempotent.
@@ -31,11 +31,13 @@ necro_load_agents() {
 }
 
 # Given a pane's foreground command, echo the matching agent name ("" if none).
+# Optional 2nd arg: the pane id, forwarded to each adapter's matches for agents
+# whose foreground command is ambiguous (Cursor shows up as `node`).
 necro_agent_for_cmd() {
-  local cmd="$1" name
+  local cmd="$1" pane="${2:-}" name
   for name in $(necro_enabled_agents); do
     if declare -f "agent_${name}_matches" >/dev/null 2>&1; then
-      if "agent_${name}_matches" "$cmd"; then
+      if "agent_${name}_matches" "$cmd" "$pane"; then
         printf '%s' "$name"
         return 0
       fi
