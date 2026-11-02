@@ -14,8 +14,10 @@ them — with the exact session resumed — after a crash, reboot, or
 `tmux kill-server`.
 
 It is **multi-agent**: [Claude Code](https://claude.com/claude-code) and
-[Codex](https://developers.openai.com/codex/cli/) work out of the box, and
-adding another agent is one small adapter file.
+[Codex](https://developers.openai.com/codex/cli/),
+[Cursor Agent](https://cursor.com/cli) and
+[GitHub Copilot CLI](https://github.com/features/copilot/cli) work out of the box,
+and adding another agent is one small adapter file.
 
 Born from a real problem: tmux 3.6b crashes (heap corruption in copy mode) kept
 killing 9 live Claude Code sessions at once, with no way to get them back.

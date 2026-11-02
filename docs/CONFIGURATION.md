@@ -17,7 +17,7 @@ you want it to survive a restart. See
 ```tmux
 set -g @necromancer_interval         '5'             # minutes between autosaves
 set -g @necromancer_max_snapshots    '288'           # snapshot files to keep (~24h at 5m interval)
-set -g @necromancer_agents           'claude codex'  # which agents to track
+set -g @necromancer_agents           'claude codex cursor copilot'  # which agents to track
 set -g @necromancer_restore_key      'ai'            # prefix chord for restore popup (two letters → prefix+a then i; a single key name still works)
 set -g @necromancer_snapshot_dir     '~/.claude/tmux-snapshots'  # where snapshots live
 set -g @necromancer_log_dir         '~/.tmux-ai-necromancer-logs'  # script logs
@@ -28,6 +28,8 @@ set -g @necromancer_watch_tick      '1'             # watcher daemon polling int
 set -g @necromancer_limit_check_interval '60'       # seconds between rate-limit auto-saves (0 disables; or NECROMANCER_LIMIT_CHECK_INTERVAL)
 set -g @necromancer_claude_commands  'claude'        # space-separated command names for Claude Code (add aliases, e.g. 'claude cc')
 set -g @necromancer_codex_commands   'codex codex-*' # same, for Codex; entries are globs (the default covers the truncated native binary)
+set -g @necromancer_cursor_commands  'cursor-agent node agent' # Cursor Agent; node/agent only count with the Cursor bundle in argv
+set -g @necromancer_copilot_commands 'copilot'       # GitHub Copilot CLI (globs, like Codex)
 set -g @necromancer_resume_delay        '5'  # seconds to pause between resume batches
 set -g @necromancer_resume_batch_size   '1'  # resumes launched per batch before pausing
 set -g @necromancer_resume_message      'continue'  # text sent into each pane after resume ('' disables)
