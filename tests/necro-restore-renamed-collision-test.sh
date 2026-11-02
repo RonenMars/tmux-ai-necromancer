@@ -28,12 +28,17 @@ case "\$1" in
   set-option)
     [ -n "\${TAGFAIL:-}" ] && exit 1
     awk -F'\t' -v OFS='\t' -v id="\$3" -v tag="\$5" '\$1==id{\$3=tag}1' "\$S" > "\$S.n" && mv "\$S.n" "\$S" ;;
-  list-sessions) awk -F'\t' '{print \$3 "\t" \$2}' "\$S" ;;
+  list-sessions)
+    case "\$*" in
+      *'#{@necro_session}'*) awk -F'\t' '{print \$3 "\t" \$2}' "\$S" ;;
+      *) cut -f2 "\$S" ;;
+    esac ;;
   list-windows) printf '@30\n' ;;
   list-panes)
     case " \$* " in
       *' -t =dotfiles: '*) printf '%%30\n' ;;
       *' -t =dotfiles-restored: '*) printf '%%31\n' ;;
+      *' -t =dotfiles-restored-3: '*) printf '%%32\n' ;;
       *) exit 1 ;;
     esac ;;
   display-message) printf 'zsh\n' ;;
@@ -56,6 +61,17 @@ grep -qF "send-keys -t %31 codex resume $U2" "$CALLS" || bad "second resume merg
 n="$(grep -c '^new-session' "$CALLS")"
 bash "$ROOT/scripts/necro-restore.sh" "$SNAP" >/dev/null 2>&1
 [ "$(grep -c '^new-session' "$CALLS")" = "$n" ] || bad "rerun created another session"
+
+# Both an untagged suffix and a suffix tagged for another snapshot name are
+# occupied. Neither may be claimed or overwritten; restore must keep looking.
+printf '$70\tdotfiles-restored\t\n$71\tdotfiles-restored-2\tother\n' > "$SESS"
+: > "$CALLS"
+NECROMANCER_RESUME_DELAY=0 bash "$ROOT/scripts/necro-restore.sh" "$SNAP" >/dev/null 2>&1
+[ "$(wc -l < "$SESS" | tr -d ' ')" = 4 ] || bad "occupied suffixes prevented the second session from being created"
+grep -qF 'new-session -d -s dotfiles-restored-3' "$CALLS" || bad "restore did not choose the next free suffix"
+grep -qF "send-keys -t %32 codex resume $U2" "$CALLS" || bad "second resume did not reach the session with a free suffix"
+grep -qxF $'$70\tdotfiles-restored\t' "$SESS" || bad "untagged suffix session was changed"
+grep -qxF $'$71\tdotfiles-restored-2\tother' "$SESS" || bad "differently tagged suffix session was changed"
 
 # A failed tag is reported, not swallowed.
 : > "$SESS"; : > "$CALLS"

@@ -387,6 +387,7 @@ bash tests/necro-menu-cleanup-pin-test.sh # menu cleanup never deletes the pinne
 bash tests/necro-restore-claim-group-test.sh # claimed windows group later records (no flattening)
 bash tests/necro-restore-numeric-session-create-test.sh # numeric session creation targets the intended session
 bash tests/necro-restore-numeric-session-target-test.sh # numeric session reruns resolve markers in the correct session
+bash tests/necro-restore-session-name-test.sh # backslashes in tagged and untagged session names match literally
 bash tests/necro-agent-scrape-ps-resume-test.sh   # ps-argv is ground truth for pane UUID pinning
 bash tests/necro-agent-scrape-ps-resume-multichild-test.sh  # finds claude among sibling processes
 bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts

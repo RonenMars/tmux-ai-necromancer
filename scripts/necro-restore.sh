@@ -493,15 +493,17 @@ window_current_command() {
 # that now sits under the name "dotfiles" is not mistaken for the snapshot's
 # real "dotfiles". One list-sessions call per lookup.
 resolve_session() {
+  # ENVIRON preserves literal backslashes that awk's -v would interpret.
   tmux list-sessions -F "#{@necro_session}"$'\t'"#{session_name}" 2>/dev/null \
-    | awk -F'\t' -v n="$1" '
+    | NECRO_SESSION_NAME="$1" awk -F'\t' '
+        BEGIN { n = ENVIRON["NECRO_SESSION_NAME"] }
         $1 == n { print $2; found = 1; exit }
         $1 == "" && $2 == n { plain = $2 }
         END { if (!found && plain != "") print plain }'
 }
 
 ensure_session() {
-  local session="$1" cwd="$2" name="$3" sid live_name
+  local session="$1" cwd="$2" name="$3" sid live_name live_names suffix=1
   if [ -n "$(resolve_session "$session")" ]; then
     printf '0'  # session pre-existed
     return 0
@@ -514,7 +516,12 @@ ensure_session() {
       # The name is taken by a session tagged for another snapshot name (a
       # hook renamed it there): create under a free name; the tag finds it.
       live_name="$session"
-      tmux has-session -t "=$session" 2>/dev/null && live_name="${session}-restored"
+      live_names="$(tmux list-sessions -F '#{session_name}' 2>/dev/null || true)"
+      while grep -qxF -- "$live_name" <<< "$live_names"; do
+        live_name="${session}-restored"
+        [ "$suffix" -gt 1 ] && live_name="${live_name}-${suffix}"
+        suffix=$((suffix + 1))
+      done
       sid="$(tmux new-session -d -s "$live_name" -c "$cwd" -n "$name" -P -F '#{session_id}')" || \
         necro_warn "could not create session '$session'"
       if [ -n "$sid" ]; then
