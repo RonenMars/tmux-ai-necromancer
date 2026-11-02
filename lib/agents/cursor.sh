@@ -36,7 +36,10 @@ agent_cursor_matches() {
   [ -n "$pane_pid" ] || pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"
   [ -n "$pane_pid" ] || return 1
   for pid in "$pane_pid" $(pgrep -P "$pane_pid" 2>/dev/null); do
-    ps -o command= -p "$pid" 2>/dev/null | grep -q '/cursor-agent/versions/' && return 0
+    # '+' in stat = foreground process group: a Cursor left running with `&`
+    # in a pane whose foreground is another node process must not match.
+    ps -o stat=,command= -p "$pid" 2>/dev/null \
+      | grep -qE '^ *[^ ]*\+ .*/cursor-agent/versions/' && return 0
   done
   return 1
 }
@@ -45,9 +48,13 @@ agent_cursor_project_dir() {
   printf '%s' "$CURSOR_CHATS_DIR"
 }
 
-# Cursor names the per-cwd folder md5(cwd).
+# Cursor names the per-cwd folder md5(process.cwd()), and Node's process.cwd()
+# is the PHYSICAL path, so a symlinked cwd must be resolved first; a missing
+# dir falls back to the path as given.
 _cursor_cwd_hash() {
-  printf '%s' "$1" | { md5 -q 2>/dev/null || md5sum | cut -d' ' -f1; }
+  local phys
+  phys="$(cd -P "$1" 2>/dev/null && pwd -P)" || phys="$1"
+  printf '%s' "$phys" | { md5 -q 2>/dev/null || md5sum | cut -d' ' -f1; }
 }
 
 agent_cursor_latest_session_id() {
@@ -93,7 +100,7 @@ agent_cursor_resume_cmd() {
   printf 'cursor-agent --resume %s' "$1"
 }
 
-# Cursor's CLI has no documented clean-exit command; /quit is its slash form.
-agent_cursor_exit_keys() {
-  printf '/quit'
-}
+# No agent_cursor_exit_keys on purpose: Cursor's quit command is unverified and
+# a guessed `/quit` typed into a live chat could be sent as a prompt. The
+# dispatcher then sends nothing and the interactive capture falls back to the
+# filesystem id (see necro_agent_exit_keys).

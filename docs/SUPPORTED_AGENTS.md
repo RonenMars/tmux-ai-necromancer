@@ -17,6 +17,10 @@ bundled node), so the adapter confirms from the process argv before claiming a
 pane. It only ever claims `node`/`agent` panes whose process runs the
 `cursor-agent/versions/…` bundle, and cannot read previews from `store.db`.
 An agent suspended with Ctrl-Z is not recognised as alive by the watcher.
-Enable it with `set -g @necromancer_agents "claude codex cursor"`.
+Cursor is enabled by default since #66; to opt out, set
+`set -g @necromancer_agents "claude codex"`. Interactive exit-capture sends no
+exit keys to Cursor (its quit command is unverified), so it records the newest
+chat for the cwd instead. Chat folders are keyed by the cwd's physical path, so
+a symlinked cwd is resolved before hashing.
 
 Want another agent? See [`agents.md`](agents.md) — it's one file.

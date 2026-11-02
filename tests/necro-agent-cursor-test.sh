@@ -17,8 +17,8 @@ tmux() {
   return 0
 }
 pgrep() { echo 4343; }
-PS_ARGV=""
-ps() { printf '%s\n' "$PS_ARGV"; }
+PS_ARGV=""; PS_STAT="S+"
+ps() { case "$*" in *stat=*) printf '%s %s\n' "$PS_STAT" "$PS_ARGV" ;; *) printf '%s\n' "$PS_ARGV" ;; esac; }
 
 . "$ROOT/lib/common.sh"
 . "$ROOT/lib/agents/cursor.sh"
@@ -40,6 +40,9 @@ check "cursor-agent needs no argv"    y "$(matches cursor-agent)"
 check "node without a pane id"        n "$(matches node)"
 PS_ARGV="node /app/vite.js"
 check "node running something else"   n "$(matches node %1)"
+PS_ARGV="$BUNDLE"; PS_STAT="S"
+check "backgrounded cursor is not foreground"  n "$(matches node %1)"
+PS_STAT="S+"
 PS_ARGV="$BUNDLE"
 check "zsh is never cursor"           n "$(matches zsh %1)"
 check "claude is never cursor"        n "$(matches claude %1)"
@@ -64,6 +67,11 @@ old" "$(agent_cursor_all_session_ids "$CWD")"
 check "latest" "new" "$(agent_cursor_latest_session_id "$CWD")"
 floor="$(date -j -f %Y%m%d%H%M 202601150000 +%s 2>/dev/null || date -d 2026-01-15 +%s)"
 check "min_epoch drops older chat" "new" "$(agent_cursor_all_session_ids "$CWD" "$floor")"
+mkdir -p "$TMP/real/proj"; ln -s "$TMP/real/proj" "$TMP/link"
+PH="$(cd -P "$TMP/real/proj" && pwd -P)"; HP="$(printf '%s' "$PH" | md5 -q 2>/dev/null || printf '%s' "$PH" | md5sum | cut -d' ' -f1)"
+mkdir -p "$CURSOR_CHATS_DIR/$HP/sym"; printf '{"hasConversation":true}' > "$CURSOR_CHATS_DIR/$HP/sym/meta.json"
+check "symlinked cwd resolves to the physical-path hash" "sym" "$(agent_cursor_all_session_ids "$TMP/link")"
+check "no exit keys function (unverified /quit)" n "$(declare -f agent_cursor_exit_keys >/dev/null && echo y || echo n)"
 check "unknown cwd" "" "$(agent_cursor_all_session_ids /nope)"
 check "resume cmd" "cursor-agent --resume $UUID" "$(agent_cursor_resume_cmd "$UUID")"
 

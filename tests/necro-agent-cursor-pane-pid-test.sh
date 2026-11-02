@@ -22,6 +22,7 @@ PS_ARGV=""
 ps() {
   case "$*" in
     *comm=*) echo node ;;
+    *stat=*) printf 'S+ %s\n' "$PS_ARGV" ;;
     *) printf '%s\n' "$PS_ARGV" ;;
   esac
 }
