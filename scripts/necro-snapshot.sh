@@ -200,17 +200,17 @@ echo "Snapshot will be written to: $OUT"
 echo
 
 snapshot=$(tmux list-panes -a -F \
-  '#{pane_id}	#{session_name}	#{window_index}	#{window_name}	#{pane_current_path}	#{pane_current_command}	#{window_layout}	#{window_zoomed_flag}	#{pane_active}	#{window_active}')
+  '#{pane_id}	#{session_name}	#{window_index}	#{window_name}	#{pane_current_path}	#{pane_current_command}	#{window_layout}	#{window_zoomed_flag}	#{pane_active}	#{window_active}	#{pane_pid}')
 total=$(printf '%s\n' "$snapshot" | wc -l | tr -d ' ')
 i=0
 
-while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed pactive wactive; do
+while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed pactive wactive pane_pid; do
   [ -z "$pane_id" ] && continue
   i=$((i + 1))
   printf '\n[%d/%d] %s  %s:%s  %s  (cmd=%s)\n' \
     "$i" "$total" "$pane_id" "$session" "$win_idx" "$win_name" "$cmd"
 
-  agent="$(necro_agent_for_cmd "$cmd" "$pane_id")"
+  agent="$(necro_agent_for_cmd "$cmd" "$pane_id" "$pane_pid")"
 
   # --rate-limited: only live agent panes whose scrollback shows a limit
   # banner. Idle shells / non-agents are skipped (a limited Claude/Codex is
