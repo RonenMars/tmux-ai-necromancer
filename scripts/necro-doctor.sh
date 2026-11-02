@@ -202,11 +202,11 @@ section "Live agent panes"
 agent_total=0
 if [ "$HAVE_SERVER" = "1" ]; then
   pane_total=0; agent_total=0; pinned_total=0; unpinned_list=""
-  while IFS=$'\t' read -r pane_id pane_cmd; do
+  while IFS=$'\t' read -r pane_id pane_cmd pane_pid; do
     [ -n "$pane_id" ] || continue
     pane_total=$((pane_total + 1))
     necro_is_idle_shell "$pane_cmd" && continue
-    this_agent="$(necro_agent_for_cmd "$pane_cmd" "$pane_id")"
+    this_agent="$(necro_agent_for_cmd "$pane_cmd" "$pane_id" "$pane_pid")"
     [ -n "$this_agent" ] || continue
     agent_total=$((agent_total + 1))
     if [ -n "$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)" ]; then
@@ -214,7 +214,7 @@ if [ "$HAVE_SERVER" = "1" ]; then
     else
       unpinned_list="$unpinned_list $pane_id($this_agent)"
     fi
-  done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_command}' 2>/dev/null)
+  done < <(tmux list-panes -a -F '#{pane_id}	#{pane_current_command}	#{pane_pid}' 2>/dev/null)
 
   echo "  $pane_total pane(s), $agent_total running a known agent"
   if [ "$agent_total" = "0" ]; then

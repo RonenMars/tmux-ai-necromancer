@@ -118,10 +118,10 @@ _necro_unescape_fs() {
   printf '%s\n' "${text//\\037/$NECRO_FS}"
 }
 
-while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent exited first_seen cwd; do
+while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent exited first_seen cwd pane_pid; do
   [ -z "$pane_id" ] && continue
 
-  agent="$(necro_agent_for_cmd "$cmd" "$pane_id")"
+  agent="$(necro_agent_for_cmd "$cmd" "$pane_id" "$pane_pid")"
 
   # ── Case 1: agent restarted in a pane that previously exited ──────────────
   if [ -n "$agent" ] && [ "$exited" = "1" ]; then
@@ -202,7 +202,7 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
     continue
   fi
 
-done < <(tmux list-panes -a -F "#{pane_id}${NECRO_FS}#{pane_current_command}${NECRO_FS}#{@necro_uuid}${NECRO_FS}#{@necro_cmd}${NECRO_FS}#{@necro_agent}${NECRO_FS}#{@necro_agent_exited}${NECRO_FS}#{@necro_pane_first_seen}${NECRO_FS}#{pane_current_path}" 2>/dev/null | _necro_unescape_fs)
+done < <(tmux list-panes -a -F "#{pane_id}${NECRO_FS}#{pane_current_command}${NECRO_FS}#{@necro_uuid}${NECRO_FS}#{@necro_cmd}${NECRO_FS}#{@necro_agent}${NECRO_FS}#{@necro_agent_exited}${NECRO_FS}#{@necro_pane_first_seen}${NECRO_FS}#{pane_current_path}${NECRO_FS}#{pane_pid}" 2>/dev/null | _necro_unescape_fs)
 
 # Throttled rate-limit auto-save. capture-pane is O(agent panes), so this must
 # NOT run every watch tick (invariant 15). Default interval is 60s. The snapshot
