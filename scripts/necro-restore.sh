@@ -484,16 +484,51 @@ window_current_command() {
   tmux display-message -p -t "$target" '#{pane_current_command}' 2>/dev/null || true
 }
 
+# A tmux after-new-session hook can rename the session we just created (e.g. a
+# numeric name -> its cwd basename), so the snapshot name stops matching. Each
+# session we create is tagged @necro_session=<snapshot name>; resolve_session
+# prints the live name for a snapshot name (or "" if none): a session tagged
+# with that name wins, else an UNtagged session of that name. A session tagged
+# for a different snapshot name never matches by name alone, so a renamed "1"
+# that now sits under the name "dotfiles" is not mistaken for the snapshot's
+# real "dotfiles". One list-sessions call per lookup.
+resolve_session() {
+  # ENVIRON preserves literal backslashes that awk's -v would interpret.
+  tmux list-sessions -F "#{@necro_session}"$'\t'"#{session_name}" 2>/dev/null \
+    | NECRO_SESSION_NAME="$1" awk -F'\t' '
+        BEGIN { n = ENVIRON["NECRO_SESSION_NAME"] }
+        $1 == n { print $2; found = 1; exit }
+        $1 == "" && $2 == n { plain = $2 }
+        END { if (!found && plain != "") print plain }'
+}
+
 ensure_session() {
-  local session="$1" cwd="$2" name="$3"
-  if tmux has-session -t "=$session" 2>/dev/null; then
+  local session="$1" cwd="$2" name="$3" sid live_name live_names suffix=1
+  if [ -n "$(resolve_session "$session")" ]; then
     printf '0'  # session pre-existed
     return 0
   fi
   {
     necro_say "creating session '$session' (cwd=$cwd)"
-    run tmux new-session -d -s "$session" -c "$cwd" -n "$name" || \
-      necro_warn "could not create session '$session'"
+    if [ "$DRY_RUN" = "1" ]; then
+      run tmux new-session -d -s "$session" -c "$cwd" -n "$name"
+    else
+      # The name is taken by a session tagged for another snapshot name (a
+      # hook renamed it there): create under a free name; the tag finds it.
+      live_name="$session"
+      live_names="$(tmux list-sessions -F '#{session_name}' 2>/dev/null || true)"
+      while grep -qxF -- "$live_name" <<< "$live_names"; do
+        live_name="${session}-restored"
+        [ "$suffix" -gt 1 ] && live_name="${live_name}-${suffix}"
+        suffix=$((suffix + 1))
+      done
+      sid="$(tmux new-session -d -s "$live_name" -c "$cwd" -n "$name" -P -F '#{session_id}')" || \
+        necro_warn "could not create session '$session'"
+      if [ -n "$sid" ]; then
+        tmux set-option -t "$sid" @necro_session "$session" || \
+          necro_warn "could not tag session '$live_name'; a rerun may create a duplicate"
+      fi
+    fi
   } >&2
   printf '1'  # session freshly created
 }
@@ -600,6 +635,7 @@ while IFS= read -r line; do
   [ -n "$layout" ] && [ -z "$(group_get "$group" layout)" ] && group_set "$group" layout "$layout"
 
   session_fresh="$(ensure_session "$session" "$cwd" "$safe_name")"
+  live_session="$(resolve_session "$session")"; [ -n "$live_session" ] && session="$live_session"
 
   # Idempotency: claim matching unmarked panes first (tmux-resurrect creates
   # layout-only shells with no @necro_id), then fall back to existing markers.
