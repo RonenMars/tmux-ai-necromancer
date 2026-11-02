@@ -33,11 +33,13 @@ necro_load_agents() {
 # Given a pane's foreground command, echo the matching agent name ("" if none).
 # Optional 2nd arg: the pane id, forwarded to each adapter's matches for agents
 # whose foreground command is ambiguous (Cursor shows up as `node`).
+# Optional 3rd arg: that pane's pid, so a caller that already has it (the
+# watcher reads it from list-panes) spares the adapter a tmux call per pane.
 necro_agent_for_cmd() {
-  local cmd="$1" pane="${2:-}" name
+  local cmd="$1" pane="${2:-}" pane_pid="${3:-}" name
   for name in $(necro_enabled_agents); do
     if declare -f "agent_${name}_matches" >/dev/null 2>&1; then
-      if "agent_${name}_matches" "$cmd" "$pane"; then
+      if "agent_${name}_matches" "$cmd" "$pane" "$pane_pid"; then
         printf '%s' "$name"
         return 0
       fi
@@ -61,7 +63,7 @@ necro_agent_alive_in_pane() {
   for child in $(pgrep -P "$pane_pid" 2>/dev/null); do
     ccmd="$(ps -o comm= -p "$child" 2>/dev/null)"
     ccmd="${ccmd##*/}"  # basename — ps may print a full path
-    agent="$(necro_agent_for_cmd "$ccmd")"
+    agent="$(necro_agent_for_cmd "$ccmd" "$pane" "$pane_pid")"
     if [ -n "$agent" ]; then
       printf '%s' "$agent"
       return 0

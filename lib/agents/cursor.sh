@@ -16,12 +16,12 @@
 CURSOR_UUID_RE='[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 CURSOR_CHATS_DIR="$HOME/.cursor/chats"
 
-# agent_cursor_matches <pane_current_command> [pane_id]
+# agent_cursor_matches <pane_current_command> [pane_id] [pane_pid]
 # `cursor-agent` is unambiguous. Any other listed name (default: node, agent)
 # only counts when the pane's shell or one of its children runs the Cursor
 # bundle; with no pane id the ambiguous names never match.
 agent_cursor_matches() {
-  local cmd="$1" pane="${2:-}" name cmds listed=1
+  local cmd="$1" pane="${2:-}" pane_pid="${3:-}" name cmds listed=1
   cmds="$(necro_tmux_option @necromancer_cursor_commands "cursor-agent node agent")"
   set -f   # see agent_codex_matches: don't pathname-expand the pattern list
   for name in $cmds; do
@@ -32,8 +32,8 @@ agent_cursor_matches() {
   [ "$listed" = "0" ] || return 1
   [ "$cmd" = "cursor-agent" ] && return 0
   [ -n "$pane" ] || return 1
-  local pane_pid pid
-  pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"
+  local pid
+  [ -n "$pane_pid" ] || pane_pid="$(tmux display-message -p -t "$pane" '#{pane_pid}' 2>/dev/null)"
   [ -n "$pane_pid" ] || return 1
   for pid in "$pane_pid" $(pgrep -P "$pane_pid" 2>/dev/null); do
     ps -o command= -p "$pid" 2>/dev/null | grep -q '/cursor-agent/versions/' && return 0
