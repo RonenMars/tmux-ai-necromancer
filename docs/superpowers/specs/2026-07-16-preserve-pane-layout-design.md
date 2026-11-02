@@ -1,3 +1,5 @@
+> **Historical record (shipped).** Written before implementation; the code and `CLAUDE.md` invariants are the current source of truth.
+
 # Design: preserve pane layout geometry through snapshot/restore
 
 Date: 2026-07-16

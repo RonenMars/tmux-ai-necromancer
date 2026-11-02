@@ -1,7 +1,7 @@
 # Manual test scenarios
 
 Real-world exercises for a developer running multiple tmux sessions, windows,
-and panes with live AI agents (Claude Code / Codex). Run these by hand against
+and panes with live AI agents (Claude Code / Codex / Cursor / Copilot). Run these by hand against
 your actual sessions — no test harness, no fake data.
 
 ## Capture the current state on command (no 5-min wait)
