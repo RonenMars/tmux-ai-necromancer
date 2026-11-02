@@ -406,6 +406,7 @@ bash tests/necro-restore-resume-start-delay-test.sh  # restore waits for a fresh
 bash tests/necro-restore-batch-skips-test.sh      # skipped records don't consume a pacing batch slot
 bash tests/necro-snapshot-layout-field-test.sh    # snapshot records carry the pane's window_layout
 bash tests/necro-snapshot-pane-pid-test.sh        # snapshot and doctor take #{pane_pid} from list-panes, no per-pane display-message
+bash tests/necro-snapshot-no-exit-keys-test.sh   # an agent with no exit keys (Cursor) is not prompted, sent keys or waited on
 bash tests/necro-snapshot-active-zoom-field-test.sh  # records carry zoomed/pane_active/window_active (0 when tmux omits them)
 bash tests/necro-snapshot-fallback-min-epoch-test.sh  # latest-jsonl fallback rejects transcripts older than the pane
 bash tests/necro-snapshot-no-tty-guard-test.sh    # exit-capture refused without a real controlling tty

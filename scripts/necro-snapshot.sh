@@ -292,6 +292,20 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
     continue
   fi
 
+  # No exit keys (Cursor): nothing to send, so don't prompt, wait, or claim to
+  # exit it — record the filesystem id and leave the pane alone.
+  if [ -z "$(necro_agent_exit_keys "$agent")" ]; then
+    fb="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
+    if [ -n "$fb" ]; then
+      echo "  no exit keys for $agent — left running, fallback id: $fb"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$fb" "latest-jsonl" "$layout" "$zoomed" "$pactive" "$wactive"
+    else
+      echo "  no exit keys for $agent — left running, no session found, recording without id"
+      emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "" "" "$layout" "$zoomed" "$pactive" "$wactive"
+    fi
+    continue
+  fi
+
   # Live agent, interactive capture: show pane, confirm, send exit keys.
   tmux switch-client -t "$pane_id" 2>/dev/null \
     || tmux select-window -t "$pane_id" 2>/dev/null || true
