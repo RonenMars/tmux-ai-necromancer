@@ -7,7 +7,7 @@
 # User-tunable options (set BEFORE the run-shell that sources tpm, in tmux.conf):
 #   @necromancer_interval        minutes between autosaves            (default 5)
 #   @necromancer_max_snapshots   autosave files to keep               (default 288 ≈ 24h @ 5m)
-#   @necromancer_agents          space-separated agent list           (default "claude codex cursor")
+#   @necromancer_agents          space-separated agent list           (default "claude codex cursor copilot")
 #   @necromancer_snapshot_dir    where snapshots live  (default ~/.claude/tmux-snapshots)
 #   @necromancer_restore_key     prefix chord to run restore          (default ai)
 #   @necromancer_log_dir         where script logs live              (default ~/.tmux-ai-necromancer-logs)
@@ -20,6 +20,7 @@
 #   @necromancer_claude_commands   command names that mean Claude Code    (default "claude")
 #   @necromancer_codex_commands    command names that mean Codex   (default "codex codex-*")
 #   @necromancer_cursor_commands   command names that mean Cursor  (default "cursor-agent node agent"; node/agent also need the Cursor bundle in argv)
+#   @necromancer_copilot_commands  command names that mean GitHub Copilot CLI (default "copilot")
 #
 # Read by the scripts themselves, not defaulted here (in-code fallbacks):
 #   @necromancer_resume_message       text sent into a pane after resume (default "continue")
@@ -51,10 +52,11 @@ set_default() {
 
 set_default "@necromancer_interval"        "5"
 set_default "@necromancer_max_snapshots"   "288"
-set_default "@necromancer_agents"          "claude codex cursor"
+set_default "@necromancer_agents"          "claude codex cursor copilot"
 set_default "@necromancer_cursor_commands" "cursor-agent node agent"
 set_default "@necromancer_claude_commands" "claude"
 set_default "@necromancer_codex_commands"  "codex codex-*"
+set_default "@necromancer_copilot_commands" "copilot"
 set_default "@necromancer_restore_key"     "ai"
 set_default "@necromancer_log_dir"         "~/.tmux-ai-necromancer-logs"
 set_default "@necromancer_debug"           "off"
