@@ -487,17 +487,21 @@ window_current_command() {
 # A tmux after-new-session hook can rename the session we just created (e.g. a
 # numeric name -> its cwd basename), so the snapshot name stops matching. Each
 # session we create is tagged @necro_session=<snapshot name>; resolve_session
-# prints the live name for a snapshot name (or "" if none), tag first, so
-# later targets and reruns follow the rename instead of creating a duplicate.
+# prints the live name for a snapshot name (or "" if none): a session tagged
+# with that name wins, else an UNtagged session of that name. A session tagged
+# for a different snapshot name never matches by name alone, so a renamed "1"
+# that now sits under the name "dotfiles" is not mistaken for the snapshot's
+# real "dotfiles". One list-sessions call per lookup.
 resolve_session() {
-  local session="$1"
-  if tmux has-session -t "=$session" 2>/dev/null; then printf '%s' "$session"; return 0; fi
-  tmux list-sessions -F "#{@necro_session}	#{session_name}" 2>/dev/null \
-    | awk -F'\t' -v n="$session" '$1 == n { print $2; exit }'
+  tmux list-sessions -F "#{@necro_session}"$'\t'"#{session_name}" 2>/dev/null \
+    | awk -F'\t' -v n="$1" '
+        $1 == n { print $2; found = 1; exit }
+        $1 == "" && $2 == n { plain = $2 }
+        END { if (!found && plain != "") print plain }'
 }
 
 ensure_session() {
-  local session="$1" cwd="$2" name="$3" sid
+  local session="$1" cwd="$2" name="$3" sid live_name
   if [ -n "$(resolve_session "$session")" ]; then
     printf '0'  # session pre-existed
     return 0
@@ -507,9 +511,16 @@ ensure_session() {
     if [ "$DRY_RUN" = "1" ]; then
       run tmux new-session -d -s "$session" -c "$cwd" -n "$name"
     else
-      sid="$(tmux new-session -d -s "$session" -c "$cwd" -n "$name" -P -F '#{session_id}')" || \
+      # The name is taken by a session tagged for another snapshot name (a
+      # hook renamed it there): create under a free name; the tag finds it.
+      live_name="$session"
+      tmux has-session -t "=$session" 2>/dev/null && live_name="${session}-restored"
+      sid="$(tmux new-session -d -s "$live_name" -c "$cwd" -n "$name" -P -F '#{session_id}')" || \
         necro_warn "could not create session '$session'"
-      [ -n "$sid" ] && tmux set-option -t "$sid" @necro_session "$session"
+      if [ -n "$sid" ]; then
+        tmux set-option -t "$sid" @necro_session "$session" || \
+          necro_warn "could not tag session '$live_name'; a rerun may create a duplicate"
+      fi
     fi
   } >&2
   printf '1'  # session freshly created

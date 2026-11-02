@@ -43,7 +43,7 @@ case "\$1" in
   new-window)   printf '@10\n' ;;
   split-window) printf '%%20\n' ;;
   display-message) printf 'zsh\n' ;;
-  list-sessions) exit 0 ;;
+  list-sessions) [ -f "$SESS_FLAG" ] && printf '\\ts\\n'; exit 0 ;;
   *) exit 0 ;;
 esac
 EOF

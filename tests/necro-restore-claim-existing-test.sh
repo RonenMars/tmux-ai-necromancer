@@ -54,6 +54,7 @@ case "\$1" in
     exit 9
     ;;
   list-sessions)
+    printf '\ts\n'
     exit 0
     ;;
   *)

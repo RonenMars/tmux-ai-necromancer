@@ -52,7 +52,7 @@ case "\$1" in
   display-message)
     case "\$*" in *'#{window_id}'*) printf '@20\n' ;; *) printf 'zsh\n' ;; esac
     ;;
-  list-sessions) exit 0 ;;
+  list-sessions) [ -f "$SESSION_CREATED" ] && printf '\\t2\\n'; exit 0 ;;
   *) exit 0 ;;
 esac
 EOF
