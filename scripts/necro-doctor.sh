@@ -98,13 +98,14 @@ command -v python3 >/dev/null 2>&1 && ok "python3" || bad "python3 not found —
 # without re-sourcing it changes nothing, and this is where you notice.
 section "Effective configuration"
 if [ "$HAVE_SERVER" = "1" ]; then
-  echo "  agents             $(necro_tmux_option @necromancer_agents 'claude codex')"
+  echo "  agents             $(necro_tmux_option @necromancer_agents 'claude codex cursor')"
   echo "  interval           $(necro_tmux_option @necromancer_interval 5) min"
   echo "  max_snapshots      $(necro_tmux_option @necromancer_max_snapshots 288)"
   echo "  autosave_tick      $(necro_tmux_option @necromancer_autosave_tick 60) s"
   echo "  watch_tick         $(necro_tmux_option @necromancer_watch_tick 1) s"
   echo "  claude_commands    $(necro_tmux_option @necromancer_claude_commands 'claude')"
   echo "  codex_commands     $(necro_tmux_option @necromancer_codex_commands 'codex codex-*')"
+  echo "  cursor_commands    $(necro_tmux_option @necromancer_cursor_commands 'cursor-agent node agent')"
   echo "  debug              $(necro_tmux_option @necromancer_debug off)"
 else
   warn "no tmux server — showing built-in defaults, not your live configuration"
@@ -205,7 +206,7 @@ if [ "$HAVE_SERVER" = "1" ]; then
     [ -n "$pane_id" ] || continue
     pane_total=$((pane_total + 1))
     necro_is_idle_shell "$pane_cmd" && continue
-    this_agent="$(necro_agent_for_cmd "$pane_cmd")"
+    this_agent="$(necro_agent_for_cmd "$pane_cmd" "$pane_id")"
     [ -n "$this_agent" ] || continue
     agent_total=$((agent_total + 1))
     if [ -n "$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)" ]; then

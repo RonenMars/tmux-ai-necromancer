@@ -11,6 +11,8 @@ Implement these functions, prefixed `agent_<name>_` (optional ones may be omitte
 ```bash
 # Is this pane's foreground command your agent?
 agent_<name>_matches() { [ "$1" = "<binary>" ]; }
+# Optional 2nd arg: the pane id. Use it when the foreground command is too
+# generic to trust (Cursor reports `node`) and confirm from the process argv.
 
 # Most-recent resumable session id for a working directory (filesystem
 # fallback). Echo the id, or nothing if none. This is the workhorse for
@@ -116,6 +118,7 @@ differently needs a config change, not a code change:
 |---|---|---|
 | `@necromancer_claude_commands` | `claude` | Claude Code |
 | `@necromancer_codex_commands` | `codex codex-*` | Codex |
+| `@necromancer_cursor_commands` | `cursor-agent node agent` | Cursor Agent (`node`/`agent` only with the Cursor bundle in argv) |
 
 ```tmux
 set -g @necromancer_claude_commands 'claude cc'

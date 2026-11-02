@@ -121,7 +121,7 @@ _necro_unescape_fs() {
 while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent exited first_seen cwd; do
   [ -z "$pane_id" ] && continue
 
-  agent="$(necro_agent_for_cmd "$cmd")"
+  agent="$(necro_agent_for_cmd "$cmd" "$pane_id")"
 
   # ── Case 1: agent restarted in a pane that previously exited ──────────────
   if [ -n "$agent" ] && [ "$exited" = "1" ]; then
