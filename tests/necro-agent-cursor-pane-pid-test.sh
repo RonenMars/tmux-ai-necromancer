@@ -23,7 +23,8 @@ ps() {
   case "$*" in
     *comm=*) echo node ;;
     *stat=*) printf 'S+ %s\n' "$PS_ARGV" ;;
-    *) printf '%s\n' "$PS_ARGV" ;;
+    *command=*) printf '%s\n' "$PS_ARGV" ;;
+    *) echo "unstubbed ps $*" >&2; return 1 ;;
   esac
 }
 
