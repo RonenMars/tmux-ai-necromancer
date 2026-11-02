@@ -53,6 +53,14 @@ rm "$FAKE_SCRIPTS/necro-snapshot.sh"
 ln -s "$TMPBIN/necro-snapshot.sh" "$FAKE_SCRIPTS/necro-snapshot.sh"
 export PATH="$TMPBIN:$PATH"
 
+# The "complete" log line lands just before the script releases its lock, so a
+# single immediate -d check races it. Poll briefly for the release.
+await_unlocked() {
+  local deadline=$(( $(date +%s) + 5 ))
+  while [ -d "$LOCK" ] && [ "$(date +%s)" -lt "$deadline" ]; do sleep 0.1; done
+  [ ! -d "$LOCK" ]
+}
+
 await_complete() {
   local deadline=$(( $(date +%s) + 20 ))
   while [ "$(date +%s)" -lt "$deadline" ]; do
@@ -81,7 +89,7 @@ else
   echo "FAIL: autosave did not run against an orphaned lock — the wedge is back"
   fail=1
 fi
-[ -d "$LOCK" ] && { echo "FAIL: lock still held after a completed run"; fail=1; }
+await_unlocked || { echo "FAIL: lock still held after a completed run"; fail=1; }
 
 # ── 2. A lock whose recorded pid is a LIVE autosave is left alone ───────────
 # Reclaiming this one would let two autosaves run against the same dir.

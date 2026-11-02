@@ -91,7 +91,8 @@ echo "PASS: batch size 1 pauses after every resume (${elapsed}s for 2 records)"
 start="$(date +%s)"
 NECROMANCER_RESUME_DELAY=0 bash "$ROOT/scripts/necro-restore.sh" "$SNAP" >/dev/null 2>&1
 elapsed=$(( $(date +%s) - start ))
-[ "$elapsed" -le 2 ] || {
+# Whole-second clock on a loaded runner: 3s has been observed, a real pause is 5s+.
+[ "$elapsed" -le 4 ] || {
   echo "FAIL: NECROMANCER_RESUME_DELAY=0 still took ${elapsed}s — delay=0 not honored" >&2
   exit 1
 }
