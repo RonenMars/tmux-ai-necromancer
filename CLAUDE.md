@@ -514,3 +514,13 @@ and their fixes. Key one: **sessions missing after reboot** — use `safe-reboot
 - Conventional-commit titles (`feat:`, `fix:`, `docs:`, …).
 - No AI attribution in commits/PRs.
 - Keep scripts dependency-light: bash, python3, jq, tmux. No node/ruby.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues, via the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: one `GLOSSARY.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
