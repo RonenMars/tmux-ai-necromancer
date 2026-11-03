@@ -15,7 +15,9 @@ Snapshot dir resolution honors `$NECROMANCER_SNAPSHOT_DIR`, defaulting to
 `~/.claude/tmux-snapshots`.
 
 Capture mode can exit supported agents on demand (`claude` via `/exit`, `codex`
-via `/quit`) and append a snapshot record for restore. Use `make run-dry` to
+via `/quit`) and append a snapshot record for restore. Cursor and Copilot have no
+verified quit command, so capture mode does not offer them an exit; the watcher
+and `necro-snapshot.sh` still record their sessions. Use `make run-dry` to
 exercise that flow without sending keys to tmux.
 
 ## Debug logging

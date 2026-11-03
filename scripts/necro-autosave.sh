@@ -104,7 +104,9 @@ if necro_debug_enabled; then
 else
   exec 4> /dev/null
 fi
-release_lock() { rm -f "$LOCK_DIR/pid"; rmdir "$LOCK_DIR" 2>/dev/null || true; }
+# Idempotent: the explicit call and the EXIT trap both run on bash 4+, and a
+# second rmdir would delete the lock a LATER run has since created.
+release_lock() { [ -n "${_lock_released:-}" ] && return 0; _lock_released=1; rm -f "$LOCK_DIR/pid"; rmdir "$LOCK_DIR" 2>/dev/null || true; }
 {
   # The lock is held for the LIFETIME OF THIS SUBSHELL — the work, not just the
   # setup above. Released on any exit path (success, error, kill).

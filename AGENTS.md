@@ -97,17 +97,14 @@ Three components, each run as documented elsewhere:
   `npm run dev` (serves on `http://localhost:5173/`), `npm run lint`,
   `npm run build`.
 
-Two environment gotchas. Neither is a regression in the plugin, and the first
-must not be "fixed" as part of unrelated work:
+Two environment gotchas. Neither is a regression in the plugin:
 
-- **6 of 47 bash tests fail on this VM** purely from BSD-vs-GNU tool
-  differences: `necro-doctor-test`, `necro-watch-lock-test`,
-  `necro-autosave-stale-lock-test`, `necro-agent-min-epoch-filter-test`,
-  `necro-agent-codex-min-epoch-test` all hit `stat -f %m` (BSD) which on GNU
-  `stat` prints filesystem info to stdout before failing, contaminating the
-  `|| stat -c %Y` fallback; `necro-snapshot-empty-answer-aborts-test` uses the
-  util-linux `script` whose flags differ from BSD `script`. The other 41 pass,
-  and the whole restore/snapshot engine works on Linux.
+- **Some bash tests may fail on this VM** from BSD-vs-GNU tool differences
+  (`necro-snapshot-empty-answer-aborts-test` uses the util-linux `script`,
+  whose flags differ from BSD `script`). The `stat` mtime pair that used to
+  break five others is fixed: read mtimes through `necro_file_mtime`
+  (`CLAUDE.md` invariant 16). Run the suite and treat a failure that also
+  fails on `main` as environmental, not as a regression to fix in unrelated work.
 - **tmux 3.5a escapes the `0x1f` field separator; 3.6 and later do not.**
   `list-panes -F` renders the ASCII Unit Separator as the four literal
   characters `\037`, so any consumer splitting on a real `0x1f` sees one field

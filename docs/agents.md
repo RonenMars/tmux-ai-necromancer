@@ -107,10 +107,18 @@ The two reference adapters show both shapes:
     `codex resume <uuid>`, not a `--resume <uuid>` flag. Read your agent's
     actual argv before writing this function; the flag form is not universal.
 
+- **`copilot.sh`** — one folder per session under `~/.copilot/session-state/`;
+  the cwd is the `cwd:` line of `workspace.yaml` (physical path, so resolve
+  symlinks first). Only sessions with an `events.jsonl` are resumable. Resume
+  is the flag form `copilot --resume <uuid>`, read from argv. It defines no
+  `agent_copilot_exit_keys` on purpose: an adapter without that function is
+  never sent keys by interactive capture, and the snapshot records the
+  filesystem id instead (`cursor.sh` does the same).
+
 ## Command name matching
 
 `agent_<name>_matches` is called with `pane_current_command` — the process
-name the kernel sees. Both bundled adapters read a space-separated list of
+name the kernel sees. The bundled adapters read a space-separated list of
 command names from a tmux option, so an alias or wrapper script named
 differently needs a config change, not a code change:
 
@@ -119,6 +127,7 @@ differently needs a config change, not a code change:
 | `@necromancer_claude_commands` | `claude` | Claude Code |
 | `@necromancer_codex_commands` | `codex codex-*` | Codex |
 | `@necromancer_cursor_commands` | `cursor-agent node agent` | Cursor Agent (`node`/`agent` only with the Cursor bundle in argv) |
+| `@necromancer_copilot_commands` | `copilot` | GitHub Copilot CLI |
 
 ```tmux
 set -g @necromancer_claude_commands 'claude cc'
@@ -141,7 +150,7 @@ bundled adapter.
 ## Register it
 
 ```tmux
-set -g @necromancer_agents 'claude codex <name>'
+set -g @necromancer_agents 'claude codex cursor copilot <name>'
 ```
 
 Adapters are sourced on demand; an unknown name just logs a warning and is

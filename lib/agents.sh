@@ -9,9 +9,9 @@
 #
 # Requires lib/common.sh to be sourced first (for LIB_DIR + necro_tmux_option).
 
-# Which agents are enabled. Override with `set -g @necromancer_agents "claude codex cursor"`.
+# Which agents are enabled. Override with `set -g @necromancer_agents "claude codex cursor copilot"`.
 necro_enabled_agents() {
-  necro_tmux_option @necromancer_agents "claude codex cursor"
+  necro_tmux_option @necromancer_agents "claude codex cursor copilot"
 }
 
 # Source all adapter files for the enabled agents. Idempotent.

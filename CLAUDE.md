@@ -5,7 +5,7 @@ Operating manual for AI agents (and humans) working in this repository.
 ## What this repo is
 
 `tmux-ai-necromancer` is a TPM-compatible tmux plugin that snapshots running AI
-coding-agent sessions (Claude Code, Codex, …) and resurrects them after a crash
+coding-agent sessions (Claude Code, Codex, Cursor, Copilot, …) and resurrects them after a crash
 or reboot. Pure bash + a small Go TUI. No build step for the plugin itself.
 
 ## Architecture (read before editing)
@@ -353,6 +353,23 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     call it rather than re-deriving the pair. Covered by
     `necro-file-mtime-test.sh` on both platforms.
 
+17. **Restore follows a session by its `@necro_session` tag, never by its
+    name.** An `after-new-session` tmux hook can rename the session restore
+    just created (a numeric `1` becomes its cwd basename), after which every
+    `=$session:` lookup misses it: the initial pane is never claimed, the
+    resume hits "can't find session", and a rerun creates a duplicate. So
+    `ensure_session` creates with `new-session -P -F '#{session_id}'` and tags
+    that id `@necro_session=<snapshot name>`; `resolve_session` finds it again
+    with ONE `list-sessions` call. A tagged session wins over an untagged one
+    of the same name, and a session tagged for a DIFFERENT snapshot name never
+    matches by name alone, so a renamed `1` sitting under `dotfiles` is not
+    mistaken for the snapshot's real `dotfiles`. When the name is taken by such
+    a session, create under `<name>-restored` / `-restored-2` and let the tag
+    find it. The lookup reads the name through awk `ENVIRON`, not `-v`, which
+    would interpret backslashes. A failed tag warns (a rerun may duplicate)
+    rather than failing silently. Covered by the three `necro-restore-renamed-*`
+    tests, the last on a real tmux server.
+
 ## Triaging a broken environment
 
 Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
@@ -388,6 +405,14 @@ bash tests/necro-restore-claim-group-test.sh # claimed windows group later recor
 bash tests/necro-restore-numeric-session-create-test.sh # numeric session creation targets the intended session
 bash tests/necro-restore-numeric-session-target-test.sh # numeric session reruns resolve markers in the correct session
 bash tests/necro-restore-session-name-test.sh # backslashes in tagged and untagged session names match literally
+bash tests/necro-restore-renamed-session-test.sh   # a hook-renamed session is still targeted via its @necro_session tag
+bash tests/necro-restore-renamed-collision-test.sh # a renamed "1" taking "dotfiles" doesn't swallow the real "dotfiles"; a failed tag warns
+bash tests/necro-restore-renamed-real-tmux-test.sh # same, end-to-end on an isolated real tmux server (skips without tmux)
+bash tests/necro-agent-cursor-test.sh             # Cursor adapter: node-wrapped panes, chat-store ids, no exit keys
+bash tests/necro-agent-cursor-pane-pid-test.sh    # cursor detection takes #{pane_pid} from list-panes (no per-pane tmux call)
+bash tests/necro-restore-cursor-test.sh           # a cursor record restores via cursor-agent --resume
+bash tests/necro-agent-copilot-test.sh            # Copilot adapter: matches, argv --resume, session-state lookup by cwd, no exit keys
+bash tests/necro-restore-copilot-test.sh          # a copilot record restores via copilot --resume
 bash tests/necro-agent-scrape-ps-resume-test.sh   # ps-argv is ground truth for pane UUID pinning
 bash tests/necro-agent-scrape-ps-resume-multichild-test.sh  # finds claude among sibling processes
 bash tests/necro-agent-min-epoch-filter-test.sh   # cursor-pop fallback rejects stale transcripts
