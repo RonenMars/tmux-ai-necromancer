@@ -422,6 +422,7 @@ bash tests/necro-watch-escaped-separator-test.sh  # pane walk survives tmux 3.5a
 bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp doesn't drift across ticks
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit
+bash tests/necro-watch-agent-switch-test.sh       # an agent swapped within one tick (cursor -> codex) is re-pinned, not left with the old id
 bash tests/necro-restore-only-filter-test.sh      # --only restores just the named records (pane id / uuid / cwd glob)
 bash tests/necro-restore-only-layout-test.sh      # a partially-restored window never gets its whole-window layout replayed
 bash tests/necro-restore-menu-no-tty-test.sh      # --menu refuses without a real tty, and changes nothing
@@ -469,6 +470,7 @@ bash tests/necro-restore-multipane-window-test.sh # multi-pane windows restore a
 bash tests/necro-restore-split-order-test.sh      # each split targets the previous pane, preserving record order
 bash tests/necro-restore-safety-test.sh           # restore skips oversized transcripts and unsafe cwds
 bash tests/necro-snapshot-idle-shell-test.sh      # idle shells trust only pane-local watcher state
+bash tests/necro-snapshot-pin-agent-mismatch-test.sh # a pin left by a different agent is never recorded as the current agent's session
 bash tests/necro-watch-daemon-lock-test.sh        # watcher daemon lock: one daemon per server
 ```
 

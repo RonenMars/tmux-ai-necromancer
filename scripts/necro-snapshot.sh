@@ -188,6 +188,16 @@ resolve_fallback_id() {
   necro_agent_pop_session_id "$agent" "$cwd" "$min_epoch" 2>/dev/null || true
 }
 
+# The watcher-pinned id, unless it was pinned for a different agent than the
+# one now running (agent swapped between watcher ticks) — then it's not this
+# agent's session and would restore as e.g. `codex resume <cursor chat id>`.
+pinned_uuid_for_agent() {
+  local agent="$1" pane_id="$2" pinned_agent
+  pinned_agent="$(tmux show-option -pqv -t "$pane_id" @necro_agent 2>/dev/null || true)"
+  [ -z "$pinned_agent" ] || [ "$pinned_agent" = "$agent" ] || return 0
+  tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true
+}
+
 # --- Main -------------------------------------------------------------------
 # Temp dir for per-cwd UUID cursors (file-based so they survive subshells).
 NECRO_CURSOR_DIR="$(mktemp -d)"
@@ -226,7 +236,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
         echo "  rate-limited ($agent) — already saved this limit event, skip"
         continue
       fi
-      fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
+      fb="$(pinned_uuid_for_agent "$agent" "$pane_id")"
       fb_source="pane-option"
       if [ -z "$fb" ]; then
         fb="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
@@ -276,7 +286,7 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
 
   # Live agent + --idle-only: read watcher-pinned UUID first, then cursor pop.
   if [ "$IDLE_ONLY" = "1" ]; then
-    fb="$(tmux show-option -pqv -t "$pane_id" @necro_uuid 2>/dev/null || true)"
+    fb="$(pinned_uuid_for_agent "$agent" "$pane_id")"
     fb_source="pane-option"
     if [ -z "$fb" ]; then
       fb="$(resolve_fallback_id "$agent" "$cwd" "$pane_id")"
