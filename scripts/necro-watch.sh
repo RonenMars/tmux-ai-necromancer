@@ -124,8 +124,13 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
   agent="$(necro_agent_for_cmd "$cmd" "$pane_id" "$pane_pid")"
 
   # ── Case 1: agent restarted in a pane that previously exited ──────────────
-  if [ -n "$agent" ] && [ "$exited" = "1" ]; then
-    necro_log_event "watch" "agent_restart" "pane=$pane_id" "agent=$agent"
+  # Also covers a DIFFERENT agent replacing the pinned one between two ticks
+  # (quit cursor-agent, start codex inside one @necromancer_watch_tick): no tick
+  # saw the shell, so Case 3 never marked it exited, and the old agent's id
+  # would otherwise stay pinned and restore as `codex resume <cursor chat id>`.
+  if [ -n "$agent" ] && { [ "$exited" = "1" ] ||
+       { [ -n "$pinned_agent" ] && [ "$agent" != "$pinned_agent" ]; }; }; then
+    necro_log_event "watch" "agent_restart" "pane=$pane_id" "agent=$agent" "was=${pinned_agent:-}"
     tmux set-option -pu -t "$pane_id" @necro_uuid            2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_cmd             2>/dev/null || true
     tmux set-option -pu -t "$pane_id" @necro_agent           2>/dev/null || true
