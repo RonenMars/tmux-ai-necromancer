@@ -77,7 +77,7 @@ if [ -d "$WATCH_LOCK" ]; then
 fi
 mkdir "$WATCH_LOCK" 2>/dev/null || exit 0
 trap 'rmdir "$WATCH_LOCK" 2>/dev/null' EXIT
-necro_log_event "watch" "start" "cursor_dir=$WATCH_LOCK"
+necro_log_event "watch" "start" "lock_dir=$WATCH_LOCK"
 
 tmux set-option -gq "$LAST_WATCH_OPT" "$now"
 
