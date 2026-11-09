@@ -125,6 +125,25 @@ agent_claude_scrape_ps_resume() {
     | head -1
 }
 
+# The session id Claude itself reports for the pane's running process, read
+# from ~/.claude/sessions/<pid>.json (Claude writes one per live process and
+# removes it on exit). Unlike argv, it follows a /clear or /resume inside one
+# process and a relaunch between two watcher ticks. Takes the pane's PID, not
+# its id, so the watcher needs no extra tmux call. "" when there is no file.
+agent_claude_live_session_id() {
+  local pane_pid="$1" pid f
+  [ -n "$pane_pid" ] || return 0
+  for pid in "$pane_pid" $(pgrep -P "$pane_pid" 2>/dev/null); do
+    f="$HOME/.claude/sessions/$pid.json"
+    [ -f "$f" ] || continue
+    # Only an interactive session is the pane's own: a pane process with no
+    # file of its own (a teammate) can have headless claude children.
+    grep -qE '"kind" *: *"interactive"' "$f" || continue
+    grep -oE "\"sessionId\" *: *\"$CLAUDE_UUID_RE\"" "$f" | grep -oE "$CLAUDE_UUID_RE" | head -1
+    return 0
+  done
+}
+
 # Shell command that resumes a given session id.
 agent_claude_resume_cmd() {
   printf 'claude --resume %s' "$1"

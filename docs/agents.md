@@ -35,6 +35,14 @@ agent_<name>_scrape_resume_cmd() { ... }
 # session has no id here yet — that's not a failure).
 agent_<name>_scrape_ps_resume() { ... }
 
+# Optional: the session id the agent itself records for its live process,
+# given the pane's PID (Claude: ~/.claude/sessions/<pid>.json, checked for the
+# pane process and its children). The watcher tries it before argv, and
+# re-checks every pinned pane against it each tick, so a /clear or a relaunch
+# within one tick re-pins. Must not call tmux (invariant 15). Return "" if N/A.
+# Only "kind": "interactive" files count: a headless child is not the pane.
+agent_<name>_live_session_id() { ... }
+
 # Optional: return 0 if this pane's recent scrollback shows a rate/session
 # limit banner (Claude: "hit your session limit"; Codex: "hit your usage
 # limit"). Used by necro-snapshot.sh --rate-limited and the watcher's
