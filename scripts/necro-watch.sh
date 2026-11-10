@@ -146,12 +146,32 @@ while IFS="$NECRO_FS" read -r pane_id cmd pinned_uuid pinned_cmd pinned_agent ex
     # Falls through to Case 2 (pin fresh UUID).
   fi
 
+  # ── Case 1b: pinned pane whose agent now reports a different session ──────
+  # The agent's own record of its live session (adapters that keep one; Claude
+  # does) beats every guess. It catches what Case 1 can't see: the same agent
+  # relaunched with --resume inside one tick, and a /clear or /resume that
+  # changes the session id without changing the process.
+  live_uuid=""
+  if [ -n "$agent" ]; then
+    live_uuid="$(necro_agent_live_session_id "$agent" "$pane_pid" 2>/dev/null || true)"
+  fi
+  if [ -n "$pinned_uuid" ] && [ -n "$live_uuid" ] && [ "$live_uuid" != "$pinned_uuid" ]; then
+    necro_log_event "watch" "repin_uuid" "pane=$pane_id" "agent=$agent" "source=session-file"
+    tmux set-option -p -t "$pane_id" @necro_uuid "$live_uuid" 2>/dev/null || true
+    continue
+  fi
+
   # ── Case 2: new agent pane detected, not yet pinned ───────────────────────
   if [ -n "$agent" ] && [ -z "$pinned_uuid" ]; then
-    # Ground truth first: read --resume <uuid> straight from the running
-    # process argv. Scrollback and cursor-pop are both guesses; argv isn't.
-    uuid="$(necro_agent_scrape_ps_resume "$agent" "$pane_id" 2>/dev/null || true)"
-    uuid_src="argv"
+    # Ground truth first: the agent's own live-session record, then
+    # --resume <uuid> straight from the running process argv. Scrollback and
+    # cursor-pop are both guesses; neither of these is.
+    uuid="$live_uuid"
+    uuid_src="session-file"
+    if [ -z "$uuid" ]; then
+      uuid="$(necro_agent_scrape_ps_resume "$agent" "$pane_id" 2>/dev/null || true)"
+      uuid_src="argv"
+    fi
     # Fall back to scrollback (resurrect edge case: pane started with --resume
     # but the process already exited/respawned before this tick).
     if [ -z "$uuid" ]; then

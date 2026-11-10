@@ -58,6 +58,7 @@ defining these functions (all prefixed `agent_<name>_`):
 | `agent_<name>_scrape_resume_cmd "$pane"` | `--resume <uuid>` scraped from startup scrollback, or "" |
 | `agent_<name>_scrape_ps_resume "$pane"` | id from running process argv (ground truth), or "" |
 | `agent_<name>_hit_limit "$pane"` | exit 0 if scrollback shows a rate/session-limit banner (optional) |
+| `agent_<name>_live_session_id "$pane_pid"` | the session id the agent itself reports for the pane's live process, or "" (optional; the watcher pins and re-pins from it) |
 | `agent_<name>_resume_cmd "$id"` | the shell command that resumes that id |
 | `agent_<name>_exit_keys` | keys to send for a clean exit (interactive capture) |
 
@@ -171,8 +172,8 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    Track the busy set as a space-delimited string, not a bash-4 assoc array
    (same `/bin/sh` constraint as autosave rotation).
 
-9. **Pane UUID pinning tries process argv before scrollback before cursor-pop
-   — in that order, always.** The watcher (`necro-watch.sh`) resolves which
+9. **Pane UUID pinning tries the agent's live-session record, then process
+   argv, then scrollback, then cursor-pop — in that order, always.** The watcher (`necro-watch.sh`) resolves which
    Claude/Codex session a pane belongs to via
    `agent_<name>_scrape_ps_resume` (reads `--resume <uuid>` straight from the
    pane's running process argv — ground truth) first, scrollback scrape
@@ -219,6 +220,21 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
    one. The stamp comes from the pane's `@necro_pane_first_seen`; an empty
    stamp degrades to the old unfiltered behaviour rather than refusing to
    resolve. Covered by `necro-snapshot-fallback-min-epoch-test.sh`.
+
+   **A pin is not final: the watcher re-checks every pinned pane against the
+   agent's live-session record each tick.** For Claude that record is
+   `~/.claude/sessions/<pid>.json` (`agent_claude_live_session_id`), which
+   Claude writes per live process and rewrites when the session changes. Argv
+   can't stand in for it: it is frozen at launch, so it is stale after a
+   `/clear` or an in-session `/resume`, and Case 1 only resets a pin when the
+   agent exited or its *type* changed. Observed on a real server, two panes
+   pinned to the wrong conversation in every snapshot for hours: `%42`, where
+   claude was relaunched with `--resume <other id>` 11s after a cursor-pop pin
+   (inside one 30s tick), and `%26`, whose one claude process moved to a new
+   session id six hours after it was pinned. The read is a file and a
+   `pgrep`, never a tmux call, so invariant 15's O(1) tick cost holds. No file
+   (older Claude, other agents) leaves the pin alone. Covered by
+   `necro-watch-session-file-repin-test.sh`.
 
 10. **Resume launches during restore/apply must be paced, not fired all at
     once.** `necro-restore.sh` and `necro-apply.sh` send a `claude`/`codex
@@ -423,6 +439,7 @@ bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp do
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit
 bash tests/necro-watch-agent-switch-test.sh       # an agent swapped within one tick (cursor -> codex) is re-pinned, not left with the old id
+bash tests/necro-watch-session-file-repin-test.sh # pins follow ~/.claude/sessions/<pid>.json: same-agent relaunch, /clear, stale argv
 bash tests/necro-restore-only-filter-test.sh      # --only restores just the named records (pane id / uuid / cwd glob)
 bash tests/necro-restore-only-layout-test.sh      # a partially-restored window never gets its whole-window layout replayed
 bash tests/necro-restore-menu-no-tty-test.sh      # --menu refuses without a real tty, and changes nothing

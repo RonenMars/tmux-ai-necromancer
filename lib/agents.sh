@@ -158,6 +158,12 @@ necro_agent_scrape_ps_resume() {
   "agent_${agent}_scrape_ps_resume" "$@"
 }
 
+necro_agent_live_session_id() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_live_session_id" >/dev/null 2>&1 || return 0
+  "agent_${agent}_live_session_id" "$@"
+}
+
 necro_agent_resume_cmd() {
   local agent="$1"; shift
   declare -f "agent_${agent}_resume_cmd" >/dev/null 2>&1 || return 0
