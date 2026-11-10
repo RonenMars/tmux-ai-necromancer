@@ -13,7 +13,9 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-export NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
+# Own HOME too: the real snapshot runs (autosave resolves its dir with cd -P),
+# and it reads ~/.claude/sessions for background sessions.
+export HOME="$TMP/home" NECROMANCER_SNAPSHOT_DIR="$TMP/snapshots"
 mkdir -p "$NECROMANCER_SNAPSHOT_DIR"
 
 TMPBIN="$TMP/bin"

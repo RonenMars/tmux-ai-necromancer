@@ -585,6 +585,50 @@ while IFS= read -r line; do
   pactive=$(jq -r '.pane_active // 0' <<<"$line")
   wactive=$(jq -r '.window_active // 0' <<<"$line")
 
+  # A background session has no pane: relaunch it detached in its cwd, only
+  # when no live process holds it (relaunching a running one starts a copy).
+  # That check is also what makes a rerun a no-op. Paced like pane resumes.
+  if [ "$(jq -r '.kind // empty' <<<"$line")" = "bg" ]; then
+    if [ -z "$cwd" ] || [ -z "$agent" ] || [ -z "$uuid" ]; then
+      progress_record "$i" "$total_records" "skipping bg record: missing cwd, agent or uuid"
+      skipped=$((skipped + 1)); continue
+    fi
+    if [ "$ALLOW_UNSAFE_CWD" = "0" ] && reason="$(unsafe_cwd_reason "$cwd")"; then
+      progress_record "$i" "$total_records" "skipping bg ${win_name:-$uuid}: $reason (cwd=$cwd)"
+      skipped=$((skipped + 1)); continue
+    fi
+    if ! record_selected "" "$uuid" "$cwd"; then
+      progress_record "$i" "$total_records" "filtered out bg ${win_name:-$uuid} (--only)"
+      filtered=$((filtered + 1)); continue
+    fi
+    progress_record "$i" "$total_records" "background $agent ${win_name:-?}  (uuid=$uuid cwd=$cwd)"
+    if necro_agent_session_running "$agent" "$uuid"; then
+      echo "  already running — leaving it untouched"
+      continue
+    fi
+    if [ "$agent" = "claude" ] && reason="$(claude_resume_skip_reason "$uuid" "$cwd" "$max_claude_bytes")"; then
+      echo "  skip resume: $reason"
+      resume_skipped=$((resume_skipped + 1)); skipped=$((skipped + 1)); continue
+    fi
+    bg_cmd="$(necro_agent_bg_resume_cmd "$agent" "$uuid")"
+    if [ -z "$bg_cmd" ]; then
+      echo "  skip resume: no background resume command for agent '$agent'"
+      resume_skipped=$((resume_skipped + 1)); continue
+    fi
+    if [ ! -d "$cwd" ]; then
+      echo "  skip resume: cwd $cwd is gone"
+      resume_skipped=$((resume_skipped + 1)); continue
+    fi
+    echo "  resume: $bg_cmd"
+    run bash -c "cd $(printf '%q' "$cwd") && $bg_cmd </dev/null" || echo "  WARN: relaunch failed"
+    resumed=$((resumed + 1))
+    resume_batch_count=$((resume_batch_count + 1))
+    if [ "$DRY_RUN" = "0" ] && [ "$((resume_batch_count % resume_batch))" -eq 0 ]; then
+      sleep "$resume_delay"
+    fi
+    continue
+  fi
+
   if [ -z "$session" ] || [ -z "$cwd" ]; then
     progress_record "$i" "$total_records" "skipping record: missing session or cwd"
     skipped=$((skipped + 1))

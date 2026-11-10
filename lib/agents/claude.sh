@@ -144,6 +144,41 @@ agent_claude_live_session_id() {
   done
 }
 
+# Live background sessions (`claude --bg`), which have no pane. One TSV line
+# each: session id, cwd, name, and the pane of the interactive session that
+# parked it (empty when none did). A session file outlives a killed process,
+# so liveness is `kill -0` on its pid, never the file's existence.
+agent_claude_bg_sessions() {
+  local f pid id cwd name job parent
+  for f in "$HOME"/.claude/sessions/*.json; do
+    [ -f "$f" ] || continue
+    IFS="$(printf '\t')" read -r pid id cwd name job <<EOF
+$(jq -r 'select(.kind=="bg") | [.pid, .sessionId, .cwd, (.name//""), (.jobId//"")] | @tsv' "$f" 2>/dev/null)
+EOF
+    [ -n "$id" ] && kill -0 "$pid" 2>/dev/null || continue
+    parent=""
+    [ -n "$job" ] && parent="$(jq -r --arg j "$job" 'select(.parkedJobId==$j) | .tmux // "" | sub("^.*\\.";"")' \
+      "$HOME"/.claude/sessions/*.json 2>/dev/null | head -1)"
+    printf '%s\t%s\t%s\t%s\n' "$id" "$cwd" "$name" "$parent"
+  done
+}
+
+# Exit 0 if some live claude process (pane or background) holds this session.
+agent_claude_session_running() {
+  local f pid
+  for f in "$HOME"/.claude/sessions/*.json; do
+    [ -f "$f" ] || continue
+    pid="$(jq -r --arg u "$1" 'select(.sessionId==$u) | .pid' "$f" 2>/dev/null)"
+    [ -n "$pid" ] && kill -0 "$pid" 2>/dev/null && return 0
+  done
+  return 1
+}
+
+# Shell command that relaunches a background session under the same id.
+agent_claude_bg_resume_cmd() {
+  printf 'claude --bg --resume %s' "$1"
+}
+
 # Shell command that resumes a given session id.
 agent_claude_resume_cmd() {
   printf 'claude --resume %s' "$1"

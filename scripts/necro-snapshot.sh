@@ -363,6 +363,25 @@ while IFS=$'\t' read -r pane_id session win_idx win_name cwd cmd layout zoomed p
   emit_record "$pane_id" "$session" "$win_idx" "$win_name" "$cwd" "$cmd" "$agent" "$uuid" "$uuid_source" "$layout" "$zoomed" "$pactive" "$wactive"
 done <<<"$snapshot"
 
+# Background sessions (`claude --bg`) have no pane, so the walk above never
+# sees them. Record each live one as a pane-less "kind":"bg" record. A
+# --rate-limited capture is for limited panes only, so it gets none.
+if [ "$RATE_LIMITED" != "1" ]; then
+  for bg_agent in $(necro_enabled_agents); do
+    while IFS="$(printf '\t')" read -r bg_id bg_cwd bg_name bg_parent; do
+      [ -n "$bg_id" ] || continue
+      echo "[bg] $bg_agent ${bg_name:-?}  $bg_id"
+      printf '{"kind":"bg","pane_id":"","session":"","window_index":0,"window_name":%s,"cwd":%s,"prev_cmd":"","agent":%s,"uuid":%s,"uuid_source":"%s-bg","parent_pane":%s,"window_layout":"","zoomed":0,"pane_active":0,"window_active":0,"captured_at":%s,"first_user":"","last_assistant":"","dest_session":"","dest_window_name":""}\n' \
+        "$(necro_json_escape "$bg_name")" "$(necro_json_escape "$bg_cwd")" "$(necro_json_escape "$bg_agent")" \
+        "$(necro_json_escape "$bg_id")" "$bg_agent" "$(necro_json_escape "$bg_parent")" \
+        "$(necro_json_escape "$(date -u +%Y-%m-%dT%H:%M:%SZ)")" >> "$OUT"
+      necro_log_event "snapshot" "record" "kind=bg" "agent=$bg_agent" "uuid=$bg_id"
+    done <<EOF
+$(necro_agent_bg_sessions "$bg_agent")
+EOF
+  done
+fi
+
 echo
 if [ "$RATE_LIMITED" = "1" ] && [ "$RATE_LIMITED_SAVED" != "1" ]; then
   # Only remove a file this run created. See OUT_PRE_EXISTING above.
