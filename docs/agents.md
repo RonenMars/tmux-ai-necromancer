@@ -43,6 +43,20 @@ agent_<name>_scrape_ps_resume() { ... }
 # Only "kind": "interactive" files count: a headless child is not the pane.
 agent_<name>_live_session_id() { ... }
 
+# Optional: background sessions with no pane (Claude: `claude --bg`). Print
+# one TSV line per LIVE one: id, cwd, name, parent pane (or ""). The snapshot
+# records each as a pane-less "kind":"bg" record. Judge liveness by the
+# process (kill -0), not by a state file: those outlive a killed process.
+agent_<name>_bg_sessions() { ... }
+
+# Optional: exit 0 if a live process of this agent holds the session id.
+# Restore relaunches a bg record only when this says no; without it, a
+# relaunch of a still-running session would start a second copy.
+agent_<name>_session_running() { ... }
+
+# Optional: the command that relaunches a bg record detached, in its cwd.
+agent_<name>_bg_resume_cmd() { printf '<binary> --bg --resume %s' "$1"; }
+
 # Optional: return 0 if this pane's recent scrollback shows a rate/session
 # limit banner (Claude: "hit your session limit"; Codex: "hit your usage
 # limit"). Used by necro-snapshot.sh --rate-limited and the watcher's

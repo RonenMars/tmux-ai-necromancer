@@ -164,6 +164,25 @@ necro_agent_live_session_id() {
   "agent_${agent}_live_session_id" "$@"
 }
 
+necro_agent_bg_sessions() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_bg_sessions" >/dev/null 2>&1 || return 0
+  "agent_${agent}_bg_sessions" "$@"
+}
+
+# No adapter function means "can't tell", reported as not running.
+necro_agent_session_running() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_session_running" >/dev/null 2>&1 || return 1
+  "agent_${agent}_session_running" "$@"
+}
+
+necro_agent_bg_resume_cmd() {
+  local agent="$1"; shift
+  declare -f "agent_${agent}_bg_resume_cmd" >/dev/null 2>&1 || return 0
+  "agent_${agent}_bg_resume_cmd" "$@"
+}
+
 necro_agent_resume_cmd() {
   local agent="$1"; shift
   declare -f "agent_${agent}_resume_cmd" >/dev/null 2>&1 || return 0

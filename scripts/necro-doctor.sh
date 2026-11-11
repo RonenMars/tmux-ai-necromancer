@@ -255,8 +255,9 @@ else
     fi
   fi
   records="$(grep -cve '^[[:space:]]*$' "$latest" 2>/dev/null || true)"; records="${records:-0}"
-  with_agent="$(grep -c '"agent":"[^"]' "$latest" 2>/dev/null || true)"; with_agent="${with_agent:-0}"
-  with_uuid="$(grep -c '"uuid":"[^"]' "$latest" 2>/dev/null || true)";  with_uuid="${with_uuid:-0}"
+  # Background-session records have no pane, so they count toward neither pane total.
+  with_agent="$(grep -v '"kind":"bg"' "$latest" 2>/dev/null | grep -c '"agent":"[^"]' || true)"; with_agent="${with_agent:-0}"
+  with_uuid="$(grep -v '"kind":"bg"' "$latest" 2>/dev/null | grep -c '"uuid":"[^"]' || true)";  with_uuid="${with_uuid:-0}"
   echo "  $records record(s), $with_agent with an agent, $with_uuid with a UUID"
   if [ "$records" = "0" ]; then
     bad "snapshot is empty — restore would rebuild nothing"

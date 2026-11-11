@@ -59,6 +59,9 @@ defining these functions (all prefixed `agent_<name>_`):
 | `agent_<name>_scrape_ps_resume "$pane"` | id from running process argv (ground truth), or "" |
 | `agent_<name>_hit_limit "$pane"` | exit 0 if scrollback shows a rate/session-limit banner (optional) |
 | `agent_<name>_live_session_id "$pane_pid"` | the session id the agent itself reports for the pane's live process, or "" (optional; the watcher pins and re-pins from it) |
+| `agent_<name>_bg_sessions` | one TSV line per live background session with no pane — id, cwd, name, parent pane (optional; Claude's `--bg` sessions) |
+| `agent_<name>_session_running "$id"` | exit 0 if a live process of the agent holds that id (optional; restore relaunches a bg record only when it says no) |
+| `agent_<name>_bg_resume_cmd "$id"` | the command that relaunches a bg record detached (optional) |
 | `agent_<name>_resume_cmd "$id"` | the shell command that resumes that id |
 | `agent_<name>_exit_keys` | keys to send for a clean exit (interactive capture) |
 
@@ -386,6 +389,22 @@ adapter, add its name to `@necromancer_agents`. Nothing else changes.
     rather than failing silently. Covered by the three `necro-restore-renamed-*`
     tests, the last on a real tmux server.
 
+18. **Background sessions are pane-less `"kind":"bg"` records, relaunched only
+    when no live process holds them.** A `claude --bg` session has no pane, so
+    the pane walk never saw it and a reboot lost it with nothing in the
+    snapshot. The snapshot now appends one record per live bg session
+    (`agent_<name>_bg_sessions`, never in `--rate-limited` mode), and restore
+    handles it before the session/cwd check: no window, no group bookkeeping,
+    just `claude --bg --resume <id>` run in the record's cwd, paced like pane
+    resumes. Two facts verified against the real CLI shape this. A session
+    file in `~/.claude/sessions/` survives `kill -9`, so liveness is `kill -0`
+    on its `pid`, never the file's existence. And `--bg --resume` against a
+    session that is still running does not attach: it starts a COPY under a
+    new id. So restore asks `agent_<name>_session_running` first and leaves a
+    live one alone, which is also what makes a rerun relaunch nothing. The
+    doctor's pane-coverage counts exclude bg records. Covered by
+    `necro-claude-bg-sessions-test.sh`.
+
 ## Triaging a broken environment
 
 Use the **`necro-triage`** skill (`.claude/skills/necro-triage/SKILL.md`). It
@@ -439,6 +458,7 @@ bash tests/necro-watch-first-seen-persistence-test.sh      # first-seen stamp do
 bash tests/necro-watch-first-seen-reset-on-restart-test.sh # first-seen resets on agent relaunch
 bash tests/necro-watch-suspend-vs-exit-test.sh     # a suspended (Ctrl-Z) agent is not mistaken for a real exit
 bash tests/necro-watch-agent-switch-test.sh       # an agent swapped within one tick (cursor -> codex) is re-pinned, not left with the old id
+bash tests/necro-claude-bg-sessions-test.sh       # live --bg sessions recorded pane-less; restore relaunches only dead ones, once
 bash tests/necro-watch-session-file-repin-test.sh # pins follow ~/.claude/sessions/<pid>.json: same-agent relaunch, /clear, stale argv
 bash tests/necro-restore-only-filter-test.sh      # --only restores just the named records (pane id / uuid / cwd glob)
 bash tests/necro-restore-only-layout-test.sh      # a partially-restored window never gets its whole-window layout replayed
